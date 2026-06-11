@@ -93,6 +93,7 @@ func getCard(c *gin.Context){
 }
 
 //POST: добавление игры
+//TODO: Написать тесты для проверки: разных форматов файлов (поддерживамые или нет), для отправки только одного изобрадение и для отправлки слишком большого файла
 func addGame(c *gin.Context){
 	//Привязка текстовых данных из формф
 	var req CreateGameRequest
@@ -102,56 +103,60 @@ func addGame(c *gin.Context){
 		return
 	}
 
-	//Получение всеё формы
-	form, err := c.MultipartForm()
+	//Получение большой и маленькой картинки
+	big_pic, err := c.FormFile("big_pic")
 	if err != nil{
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Файл обязателен"})
-	}
-
-	//Получение файлов
-	files := form.File["images"]
-
-	if len(files) == 0{
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Загрузите хотя бы одно фото"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Большое изображение должно быть загружено!"})
 		return
 	}
 
-	if len(files) > 2{
-		c.JSON(http.StatusBadRequest, gin.H{"error" : "Максимум 2 изображения"})
+	small_pic, err := c.FormFile("small_pic")
+	if err != nil{
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Маленькое изображение должно быть загружено!"})
+		return
 	}
 
+	//Подерживаемые формамы
 	allowExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
 
-	var imagesUrls []string
+	//Генерация уникального имени
+	ext := strings.ToLower(filepath.Ext(big_pic.Filename))
+	newPic := uuid.New().String() + ext
 
-	for _, file := range files {
-		//Валидация изоброажений
-		ext := strings.ToLower(filepath.Ext(file.Filename))
-		if !allowExts[ext]{
-			c.JSON(http.StatusBadRequest, gin.H{"error" : fmt.Sprintf("Файл %s имеет  недопустимый формат", file.Filename)})
-			return
-		}
-
-		if file.Size > 5<<20{
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Файл %s слишком большой", file.Filename)})
-			return
-		}
-
-		newFileName := uuid.New().String() + ext
-		savePath := filepath.Join("uploads", newFileName)
-
-		if err := c.SaveUploadedFile(file, savePath); err != nil{
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сохранить файл"})
-			return
-		}
-
-		imagesUrls = append(imagesUrls, fmt.Sprintf("/static/%s", newFileName))
+	//Проверка на формат файлов
+	if(!allowExts[ext]){
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Недопустимый формат файла!"})
+		return
 	}
+
+	//Проверка на размер файлоы (максимум -> 5 мб)
+	if big_pic.Size > 5<<20 || small_pic.Size > 5<<20{
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Файл слишком большой (макс 5 мб)"})
+		return
+	}
+
+	//Пути сохранения для картинок
+	savePathBig := filepath.Join("uploads/Icons/Big", newPic)
+	savePathSmall := filepath.Join("uploads/Icons/Small", newPic)
+
+	//Сохранение файлов на диск
+	if err := c.SaveUploadedFile(big_pic, savePathBig); err != nil{
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения большой иконки"})
+		return
+	}
+
+	if err := c.SaveUploadedFile(small_pic, savePathSmall); err != nil{
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения маленькой иконки"})
+		return
+	}
+
+	image_small_url := fmt.Sprintf("/static/Icons/Small/%s", newPic)
+	image_big_url := fmt.Sprintf("/static/Icons/Big/%s", newPic)
 
 	info := GameCard{
 		ID: int(uuid.New().ID()),
 		Title: req.Title,
-		IconUrl: imagesUrls[0],
+		IconUrl: image_small_url,
 	}
 
 	gameCard = append(gameCard, info)
@@ -159,7 +164,8 @@ func addGame(c *gin.Context){
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Успешно создано",
 		"title": req.Title,
-		"image_urls": imagesUrls,
+		"big_image_url": image_big_url,
+		"small_image_url": image_small_url,
 	})
 }
 
