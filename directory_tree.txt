@@ -1,0 +1,23 @@
+Server\
+├── cmd\
+│   └── api\
+│       ├── main.go
+│       └── main_test.go
+├── internal\
+│   └── game\
+│       ├── games.go
+│       └── games_test.go
+├── uploads\
+│   ├── files\
+│   │   └── 1\
+│   │       └── c952ca8f-f7a8-4845-8937-c8d74894d216.zip
+│   └── Icons\
+│       ├── Big\
+│       │   └── 45fed24d-3f75-4ded-8763-e89bafd730c9.jpg
+│       └── Small\
+│           └── 45fed24d-3f75-4ded-8763-e89bafd730c9.jpg
+├── go.mod
+├── go.sum
+├── README.md
+├── showDirecotry.py
+└── TODO.md

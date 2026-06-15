@@ -13,29 +13,29 @@ import (
 	"github.com/google/uuid"
 )
 
-type GameCard struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	IconUrl string `json:"iconUrl"`
-	GameId  int    `json:"gameId"`
-}
+// type GameCard struct {
+// 	ID      int    `json:"id"`
+// 	Title   string `json:"title"`
+// 	IconUrl string `json:"iconUrl"`
+// 	GameId  int    `json:"gameId"`
+// }
 
-type GameInfo struct {
-	ID             int             `json:"id"`
-	Title          string          `json:"title"`
-	IconUrl        string          `json:"iconUrl"`
-	TranslateCards []TranslateCard `json:"translateCards"`
-}
+// type GameInfo struct {
+// 	ID             int             `json:"id"`
+// 	Title          string          `json:"title"`
+// 	IconUrl        string          `json:"iconUrl"`
+// 	TranslateCards []TranslateCard `json:"translateCards"`
+// }
 
-type TranslateCard struct {
-	ID            int     `json:"id"`
-	AuthorName    string  `json:"authorName"`
-	Source        string  `json:"source"`
-	Version       float64 `json:"version"`
-	PercentReady  float64 `json:"percentReady"`
-	UrlToDownload string  `json:"urlToDownload"`
-	FileSize      float64 `json:"fileSize"`
-}
+// type TranslateCard struct {
+// 	ID            int     `json:"id"`
+// 	AuthorName    string  `json:"authorName"`
+// 	Source        string  `json:"source"`
+// 	Version       float64 `json:"version"`
+// 	PercentReady  float64 `json:"percentReady"`
+// 	UrlToDownload string  `json:"urlToDownload"`
+// 	FileSize      float64 `json:"fileSize"`
+// }
 
 var gameCard = []GameCard{
 	{
@@ -319,13 +319,13 @@ func addTranslate(c *gin.Context) {
 
 }
 
-func SetupGameRoutes(r *gin.Engine) {
-	r.Static("/static", "./uploads")
+// func SetupGameRoutes(r *gin.Engine) {
+// 	r.Static("/static", "./uploads")
 
-	/* /games */
-	r.GET("/games", getGame)
-	r.POST("/games/add", addGame)
-	r.POST("games/translate/:gameid", addTranslate)
-	/* /cards */
-	r.GET("/cards", getCard)
-}
+// 	/* /games */
+// 	r.GET("/games", getGame)
+// 	r.POST("/games/add", addGame)
+// 	r.POST("games/translate/:gameid", addTranslate)
+// 	/* /cards */
+// 	r.GET("/cards", getCard)
+// }

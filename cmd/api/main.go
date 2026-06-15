@@ -8,22 +8,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func setupRouter() *gin.Engine {
+func main() {
+
 	r := gin.Default()
 
-	//GET
+	repo := &game.InMemoryGameRepo{}
+
+	handler := game.NewGameHanlder(repo)
+
+	game.SetupGameRoutes(r, handler)
+
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "API работает!"})
 	})
 
-	game.SetupGameRoutes(r)
-
-	return r
-}
-
-func main(){
-
-	r := setupRouter()
-
 	r.Run(":8080")
 }
+
+//TODO: переписать запросы под новые handler и routes. Добавить поддержку sqlite
