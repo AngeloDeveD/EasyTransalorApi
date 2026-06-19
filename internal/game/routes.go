@@ -6,12 +6,8 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler) {
 
 	router.Static("/static", "./uploads")
 
-	/* /games */
-	//Надо переписать под хэндер
-	// router.GET("/games", getGame)
-	// router.POST("/games/add", addGame)
-	// router.POST("games/translate/:gameid", addTranslate)
-	/* /cards */
-
 	router.GET("/cards", handler.GetCards)
+	router.GET("/games", handler.GetGames)
+	router.POST("/games/add", handler.AddGame)
+	router.POST("games/translate/:gameid", handler.AddTranslationInfo)
 }

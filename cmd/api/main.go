@@ -1,6 +1,9 @@
 package main
 
 import (
+	"log"
+	"myapi/internal/config"
+	"myapi/internal/database"
 	"myapi/internal/game"
 
 	"net/http"
@@ -9,12 +12,26 @@ import (
 )
 
 func main() {
+	cfg := config.Load()
 
+	r := setupRouter(cfg)
+
+	r.Run(":" + cfg.Port)
+}
+
+// setupRouter настраивает роутер, подключает БД и регистрирует маршруты.
+// Вынесен отдельно, чтобы переиспользовать его в тестах (main_test.go).
+func setupRouter(cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
-	repo := &game.InMemoryGameRepo{}
+	db, err := database.ConnectSqlite(cfg.DBName)
+	if err != nil {
+		log.Fatalf("Ошибка подключения к БД: %v", err)
+	}
 
-	handler := game.NewGameHanlder(repo)
+	repo := game.NewSqlGameRepo(db)
+
+	handler := game.NewGameHandler(repo)
 
 	game.SetupGameRoutes(r, handler)
 
@@ -22,7 +39,5 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "API работает!"})
 	})
 
-	r.Run(":8080")
+	return r
 }
-
-//TODO: переписать запросы под новые handler и routes. Добавить поддержку sqlite
