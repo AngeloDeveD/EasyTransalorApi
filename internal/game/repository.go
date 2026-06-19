@@ -13,6 +13,7 @@ type GameRepository interface {
 	CreateNewGame(GameCard, GameInfo) error
 	AddTranslation(int64, TranslateCard) error
 	CheckCreatedGame(int64) error
+	GetGameInfoById(int64) (GameInfo, error)
 }
 
 type SqliteGameRepo struct {
@@ -127,6 +128,22 @@ func (r *SqliteGameRepo) AddTranslation(gameId int64, newTranslateCard Translate
 	}
 
 	return nil
+}
+
+func (r *SqliteGameRepo) GetGameInfoById(gameId int64) (GameInfo, error) {
+	var gameInfo GameInfo
+
+	err := r.db.Preload("TranslateCards").First(&gameInfo, gameId).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return GameInfo{}, errors.New("Игра не найдена")
+		}
+
+		return GameInfo{}, err
+	}
+
+	return gameInfo, nil
 }
 
 /*Для тестов*/
