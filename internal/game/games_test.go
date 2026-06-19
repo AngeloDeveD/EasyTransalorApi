@@ -2,6 +2,7 @@ package game
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -17,14 +18,17 @@ import (
 // Для имитации больших файлов
 var heavyFileBytes = make([]byte, 5*1024*1024+1)
 
+// Сборка роутера с InMemoryGameRepo (изолированный репозиторий для каждого теста)
 func setupTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode) //Переход в тестовыую зону (не будут отображаться лишие ползунки и прочая юслез тема)
+	gin.SetMode(gin.TestMode) //Переход в тестовыую зону (не будут отображаться лишние ползунки и прочая услада)
 	r := gin.New()
-	SetupGameRoutes(r) //Маршруты связанные с играми
+	repo := NewInMemoryGameRepo()
+	handler := NewGameHandler(repo)
+	SetupGameRoutes(r, handler)
 	return r
 }
 
-// Получение информации об игрых
+// Получение информации об играх
 func TestGames(t *testing.T) {
 	router := setupTestRouter()
 
@@ -35,8 +39,14 @@ func TestGames(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, w.Code)
 
-	assert.Equal(t, 1, gameInfo[0].ID)
-	assert.Equal(t, "Игра номер 1", gameInfo[0].Title)
+	//Парсим тело ответа вместо обращения к глобальной переменной
+	var games []GameInfo
+	err := json.Unmarshal(w.Body.Bytes(), &games)
+	assert.NoError(t, err)
+
+	assert.NotEmpty(t, games)
+	assert.Equal(t, 1, games[0].ID)
+	assert.Equal(t, "Игра номер 1", games[0].Title)
 }
 
 // Получение карточек игр
@@ -48,10 +58,11 @@ func TestCards(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	//GetCards возвращает StatusAccepted (202)
+	assert.Equal(t, http.StatusAccepted, w.Code)
 
 	expected := `[{
-		"id": 1, 
+		"id": 1,
 		"title": "Игра номер 1",
 		"iconUrl": "source",
 		"gameId": 1
@@ -70,7 +81,7 @@ func TestAddGames(t *testing.T) {
 	//Текстовое поле
 	_ = multiWriter.WriteField("Title", "Тестовая игра")
 
-	//Загшрузка большой картинки
+	//Загрузка большой картинки
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic.jpg")
 	assert.NoError(t, err)
 	_, err = io.WriteString(bigImage, "fake-image-content-1")
@@ -111,16 +122,14 @@ func TestAddGames_MultipleFiles_HeavyFiles(t *testing.T) {
 
 	_ = multiWriter.WriteField("Title", "Тестовая игра")
 
-	// Отправляем 3 файла (а по условию максимум 2)
-
-	//Загшрузка большой картинки с большим размеров
+	//Загрузка большой картинки с большим размером
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic_heavy.jpg")
 	assert.NoError(t, err)
 	bigImage.Write(heavyFileBytes)
 	_, err = io.WriteString(bigImage, "fake-image-content-1")
 	assert.NoError(t, err)
 
-	//Загрузка маленькой картинки с большим размеров
+	//Загрузка маленькой картинки с большим размером
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic_heavy.png")
 	assert.NoError(t, err)
 	smallImage.Write(heavyFileBytes)
@@ -148,9 +157,7 @@ func TestAddGames_MultipleFiles_UnsupportFormatFiles(t *testing.T) {
 
 	_ = multiWriter.WriteField("Title", "Тестовая игра")
 
-	// Отправляем 3 файла (а по условию максимум 2)
-
-	//Загрузка большой картинки с формате .exe
+	//Загрузка большой картинки в формате .exe
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic_heavy.exe")
 	assert.NoError(t, err)
 	_, err = io.WriteString(bigImage, "fake-image-content-1")
@@ -170,7 +177,7 @@ func TestAddGames_MultipleFiles_UnsupportFormatFiles(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Ожидаем 400 ошибку с сообщением о лимите
+	// Ожидаем 400 ошибку с сообщением о недопустимом формате
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "Недопустимый формат файла!")
 }
@@ -188,7 +195,7 @@ func TestAddTranslate(t *testing.T) {
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загшрузка большой картинки
+	//Загрузка архива перевода
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -229,7 +236,7 @@ func TestAddTranslate__WithStringId(t *testing.T) {
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загшрузка большой картинки
+	//Загрузка архива перевода
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -266,7 +273,7 @@ func TestAddTranslate__InvalidGameId(t *testing.T) {
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загшрузка большой картинки
+	//Загрузка архива перевода
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -287,10 +294,11 @@ func TestAddTranslate__InvalidGameId(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Игра с таким id не найдена")
+	//InMemoryGameRepo.CheckCreatedGame возвращает это сообщение
+	assert.Contains(t, w.Body.String(), "Игра была не найдена")
 }
 
-// Добавление перевода к игре, но с неизвестынм форматом файла
+// Добавление перевода к игре, но с неизвестным форматом файла
 func TestAddTranslate__InvaliFileFormat(t *testing.T) {
 	r := setupTestRouter()
 
@@ -303,7 +311,7 @@ func TestAddTranslate__InvaliFileFormat(t *testing.T) {
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загшрузка большой картинки
+	//Загрузка файла в недопустимом формате
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.exe")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")

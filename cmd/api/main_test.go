@@ -9,17 +9,34 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+
+	"myapi/internal/config"
 )
 
-func TestMain(m *testing.M){
+//Имена временной тестовой БД (чтобы не портить рабочую app.db)
+const testDBName = "test.db"
+
+func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
 	gin.DefaultWriter = io.Discard
-	os.Exit(m.Run())
+
+	//Направляем тесты на отдельную БД через переменную окружения
+	os.Setenv("DB_NAME", testDBName)
+
+	code := m.Run()
+
+	//Очистка тестовой БД и WAL-файлов
+	os.Remove(testDBName)
+	os.Remove(testDBName + "-wal")
+	os.Remove(testDBName + "-shm")
+
+	os.Exit(code)
 }
 
-func TestDef(t *testing.T){
+func TestDef(t *testing.T) {
 
-	router := setupRouter()
+	cfg := config.Load()
+	router := setupRouter(cfg)
 
 	req, _ := http.NewRequest("GET", "/", nil)
 

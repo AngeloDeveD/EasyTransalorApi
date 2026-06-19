@@ -3,107 +3,54 @@ package game
 import (
 	"fmt"
 	"math"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-type GameCard struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	IconUrl string `json:"iconUrl"`
-	GameId  int    `json:"gameId"`
+// Структура хэндлера
+type GameHandler struct {
+	Repo GameRepository
 }
 
-type GameInfo struct {
-	ID             int             `json:"id"`
-	Title          string          `json:"title"`
-	IconUrl        string          `json:"iconUrl"`
-	TranslateCards []TranslateCard `json:"translateCards"`
+// Конструктор для создания хэндлера
+func NewGameHandler(repo GameRepository) *GameHandler {
+	return &GameHandler{Repo: repo}
 }
 
-type TranslateCard struct {
-	ID            int     `json:"id"`
-	AuthorName    string  `json:"authorName"`
-	Source        string  `json:"source"`
-	Version       float64 `json:"version"`
-	PercentReady  float64 `json:"percentReady"`
-	UrlToDownload string  `json:"urlToDownload"`
-	FileSize      float64 `json:"fileSize"`
+// GET /cards
+/*Получение карточки игры (Без информации о переводах)*/
+func (h *GameHandler) GetCards(c *gin.Context) {
+	cards, err := h.Repo.GetAllCards()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить карточки"})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, cards)
 }
 
-var gameCard = []GameCard{
-	{
-		ID:      1,
-		Title:   "Игра номер 1",
-		IconUrl: "source",
-		GameId:  1,
-	},
+// GET /games
+/*Получение информации об игре (С информацией о переводах)*/
+func (h *GameHandler) GetGames(c *gin.Context) {
+	games, err := h.Repo.GetAllGamesInfo()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить игры"})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, games)
 }
 
-var gameInfo = []GameInfo{
-	{
-		ID:      1,
-		Title:   "Игра номер 1",
-		IconUrl: "Url1",
-		TranslateCards: []TranslateCard{
-			{
-				ID:            1,
-				AuthorName:    "Васька 1",
-				Source:        "url",
-				Version:       1.0,
-				PercentReady:  0.0,
-				UrlToDownload: "url",
-				FileSize:      0.0,
-			},
-		},
-	},
-	{
-		ID:      1,
-		Title:   "Игра номер 1",
-		IconUrl: "Url1",
-		TranslateCards: []TranslateCard{
-			{
-				ID:            1,
-				AuthorName:    "Васька 1",
-				Source:        "url",
-				Version:       1.0,
-				PercentReady:  0.0,
-				UrlToDownload: "url",
-				FileSize:      0.0,
-			},
-		},
-	},
-}
-
-type CreateGameRequest struct {
-	Title string `json:"title"`
-}
-
-type CreateTraslateRequest struct {
-	AuthorName   string  `json:"authorName"`
-	Source       string  `json:"source"`
-	Version      float64 `json:"version"`
-	PercentReady float64 `json:"percentReady"`
-}
-
-/*GET: получение информации об игре (С информацией о переводах)*/
-func getGame(c *gin.Context) {
-	c.JSON(http.StatusAccepted, gameInfo)
-}
-
-/*GET: получение карточки игры (Без информации о переводах)*/
-func getCard(c *gin.Context) {
-	c.JSON(http.StatusOK, gameCard)
-}
-
-/*POST: Добавление карточки игры*/
-func addGame(c *gin.Context) {
+//POST /games/add
+/*Добавление карточки игры*/
+func (h *GameHandler) AddGame(c *gin.Context) {
 	//Привязка текстовых данных из форм
 	var req CreateGameRequest
 
@@ -174,8 +121,6 @@ func addGame(c *gin.Context) {
 		GameId:  gameID,
 	}
 
-	gameCard = append(gameCard, card)
-
 	//Создание полной информации об игре
 	info := GameInfo{
 		ID:             gameID,
@@ -184,7 +129,12 @@ func addGame(c *gin.Context) {
 		TranslateCards: []TranslateCard{},
 	}
 
-	gameInfo = append(gameInfo, info)
+	err = h.Repo.CreateNewGame(card, info)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения данных"})
+		return
+	}
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":         "Успешно создано",
@@ -195,10 +145,9 @@ func addGame(c *gin.Context) {
 	})
 }
 
-//TODO: добавить тесты для: отправки файлов с неподдерживаемым форматом, отправка слишком больших файлов, не отправка текстовых данных и неотправка самого файла, отправка файлов разных поддердживаемых форматов, отправка неверного id
-/*POST: Добавляет архив с переводом к игре*/
-func addTranslate(c *gin.Context) {
-
+//POST /games/translate/:gameid
+/*Добавляет архив с переводом к игре*/
+func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	var req CreateTraslateRequest
 
 	if err := c.ShouldBind(&req); err != nil {
@@ -233,18 +182,10 @@ func addTranslate(c *gin.Context) {
 	//Подерживаемые формамы файлов
 	allowFileExts := map[string]bool{".zip": true, ".7zip": true, ".rar": true}
 
-	//Для поиска совпадений по id
-	found := false
+	foundGame := h.Repo.CheckCreatedGame(gameid)
 
-	for i := range gameInfo {
-		if gameInfo[i].ID == int(gameid) {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра с таким id не найдена"})
+	if foundGame != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": foundGame.Error()})
 		return
 	}
 
@@ -299,12 +240,11 @@ func addTranslate(c *gin.Context) {
 		FileSize:      roundedSize,
 	}
 
-	//Добавляем в данные созданную информацию о переводе
-	for i := range gameInfo {
-		if gameInfo[i].ID == int(gameid) {
-			gameInfo[i].TranslateCards = append(gameInfo[i].TranslateCards, trasnalteInfo)
-			break
-		}
+	saveTranslationInfo := h.Repo.AddTranslation(gameid, trasnalteInfo)
+
+	if saveTranslationInfo != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": saveTranslationInfo.Error()})
+		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -316,16 +256,4 @@ func addTranslate(c *gin.Context) {
 		"PercentReady":  trasnalteInfo.PercentReady,
 		"id":            trasnalteInfo.ID,
 	})
-
-}
-
-func SetupGameRoutes(r *gin.Engine) {
-	r.Static("/static", "./uploads")
-
-	/* /games */
-	r.GET("/games", getGame)
-	r.POST("/games/add", addGame)
-	r.POST("games/translate/:gameid", addTranslate)
-	/* /cards */
-	r.GET("/cards", getCard)
 }
