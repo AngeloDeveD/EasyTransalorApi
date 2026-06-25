@@ -287,3 +287,49 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		"id":            trasnalteInfo.ID,
 	})
 }
+
+//DELETE /games/:gameid
+/*Удаление игры*/
+func (h *GameHandler) DeleteGame(c *gin.Context) {
+	gameIdStr := c.Param("gameid")
+	gameId, err := strconv.ParseInt(gameIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Полученный id не является числом"})
+		return
+	}
+
+	if err := h.Repo.DeleteGame(gameId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка удаления игры"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"error": "Игра вместе с переводами была удалена"})
+}
+
+//DELETE /games/translate/:gameid/:transid
+/*Удаление перевода из игры*/
+func (h *GameHandler) DeleteTranslation(c *gin.Context) {
+	gameStrId := c.Param("gameid")
+	translationStrId := c.Param("transid")
+
+	gameId, err := strconv.ParseInt(gameStrId, 10, 64)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID игры не является числом"})
+		return
+	}
+
+	translationId, err := strconv.Atoi(translationStrId)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID перевода не является числом"})
+		return
+	}
+
+	if err := h.Repo.DeleteTranslation(gameId, int64(translationId)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Перевод успешно удалён"})
+}

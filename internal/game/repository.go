@@ -14,6 +14,8 @@ type GameRepository interface {
 	AddTranslation(int64, TranslateCard) error
 	CheckCreatedGame(int64) error
 	GetGameInfoById(int64) (GameInfo, error)
+	DeleteGame(gameId int64) error
+	DeleteTranslation(gameId int64, translationId int64) error
 }
 
 type SqliteGameRepo struct {
@@ -146,7 +148,45 @@ func (r *SqliteGameRepo) GetGameInfoById(gameId int64) (GameInfo, error) {
 	return gameInfo, nil
 }
 
+func (r *SqliteGameRepo) DeleteGame(gameId int64) error {
+	tx := r.db.Begin()
+
+	//Удаление всех переводов игры
+	if err := tx.Where("game_info_id = ?", gameId).Delete(&TranslateCard{}).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	//Удаление GameInfo
+	if err := tx.Delete(&GameInfo{}, gameId).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	//Удаление GameCard
+	if err := tx.Delete(&GameCard{}, gameId).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
+}
+
+func (r *SqliteGameRepo) DeleteTranslation(gameId int64, translationId int64) error {
+	result := r.db.Where("id = ? AND game_info_id = ?", translationId, gameId).Delete(&TranslateCard{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод либо не найден либо не принадлежит этой игре")
+	}
+
+	return nil
+}
+
 /*Для тестов*/
+
+//TODO: Добавить заглушки для тестов
 
 func (r *InMemoryGameRepo) GetAllCards() ([]GameCard, error) {
 	// Старые захардкоженные данные

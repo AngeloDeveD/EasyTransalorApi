@@ -2,7 +2,7 @@ package game
 
 import "github.com/gin-gonic/gin"
 
-func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.HandlerFunc) {
+func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.HandlerFunc, adminHandler gin.HandlerFunc) {
 
 	router.Static("/static", "./uploads")
 
