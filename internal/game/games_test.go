@@ -20,11 +20,20 @@ var heavyFileBytes = make([]byte, 5*1024*1024+1)
 
 // Сборка роутера с InMemoryGameRepo (изолированный репозиторий для каждого теста)
 func setupTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode) //Переход в тестовыую зону (не будут отображаться лишние ползунки и прочая услада)
+	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	repo := NewInMemoryGameRepo()
 	handler := NewGameHandler(repo)
-	SetupGameRoutes(r, handler)
+
+	// Создаем заглушку для Middleware авторизации.
+	// Она просто пропускает запрос дальше, как будто пользователь авторизован.
+	dummyAuthMiddleware := func(c *gin.Context) {
+		c.Set("userID", 1) // Имитируем, что пришел юзер с ID 1
+		c.Next()
+	}
+
+	// Передаем 3 аргумента, как теперь требует функция
+	SetupGameRoutes(r, handler, dummyAuthMiddleware)
 	return r
 }
 
@@ -39,7 +48,6 @@ func TestGames(t *testing.T) {
 
 	assert.Equal(t, http.StatusAccepted, w.Code)
 
-	//Парсим тело ответа вместо обращения к глобальной переменной
 	var games []GameInfo
 	err := json.Unmarshal(w.Body.Bytes(), &games)
 	assert.NoError(t, err)
@@ -58,15 +66,14 @@ func TestCards(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	//GetCards возвращает StatusAccepted (202)
 	assert.Equal(t, http.StatusAccepted, w.Code)
 
 	expected := `[{
-		"id": 1,
-		"title": "Игра номер 1",
-		"iconUrl": "source",
-		"gameId": 1
-	}]`
+        "id": 1,
+        "title": "Игра номер 1",
+        "iconUrl": "source",
+        "gameId": 1
+    }]`
 
 	assert.JSONEq(t, expected, w.Body.String())
 }
@@ -78,16 +85,13 @@ func TestAddGames(t *testing.T) {
 	var requestBody bytes.Buffer
 	multiWriter := multipart.NewWriter(&requestBody)
 
-	//Текстовое поле
 	_ = multiWriter.WriteField("Title", "Тестовая игра")
 
-	//Загрузка большой картинки
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic.jpg")
 	assert.NoError(t, err)
 	_, err = io.WriteString(bigImage, "fake-image-content-1")
 	assert.NoError(t, err)
 
-	//Загрузка маленькой картинки
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic.png")
 	assert.NoError(t, err)
 	_, err = io.WriteString(smallImage, "fake-image-content-2")
@@ -95,7 +99,6 @@ func TestAddGames(t *testing.T) {
 
 	multiWriter.Close()
 
-	//Создание запроса
 	req, err := http.NewRequest(http.MethodPost, "/games/add", &requestBody)
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", multiWriter.FormDataContentType())
@@ -105,12 +108,13 @@ func TestAddGames(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 	assert.Contains(t, w.Body.String(), "Тестовая игра")
-
 	assert.Contains(t, w.Body.String(), "big_image_url")
 	assert.Contains(t, w.Body.String(), "small_image_url")
 
-	// Очистка
-	os.RemoveAll("uploads")
+	// Используем t.Cleanup для надежной очистки
+	t.Cleanup(func() {
+		os.RemoveAll("uploads")
+	})
 }
 
 // Добавление игры, но картинки много весят
@@ -122,14 +126,12 @@ func TestAddGames_MultipleFiles_HeavyFiles(t *testing.T) {
 
 	_ = multiWriter.WriteField("Title", "Тестовая игра")
 
-	//Загрузка большой картинки с большим размером
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic_heavy.jpg")
 	assert.NoError(t, err)
 	bigImage.Write(heavyFileBytes)
 	_, err = io.WriteString(bigImage, "fake-image-content-1")
 	assert.NoError(t, err)
 
-	//Загрузка маленькой картинки с большим размером
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic_heavy.png")
 	assert.NoError(t, err)
 	smallImage.Write(heavyFileBytes)
@@ -143,7 +145,6 @@ func TestAddGames_MultipleFiles_HeavyFiles(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Ожидаем 400 ошибку с сообщением о лимите
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "Файл слишком большой (макс 5 мб)")
 }
@@ -157,13 +158,11 @@ func TestAddGames_MultipleFiles_UnsupportFormatFiles(t *testing.T) {
 
 	_ = multiWriter.WriteField("Title", "Тестовая игра")
 
-	//Загрузка большой картинки в формате .exe
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic_heavy.exe")
 	assert.NoError(t, err)
 	_, err = io.WriteString(bigImage, "fake-image-content-1")
 	assert.NoError(t, err)
 
-	//Загрузка маленькой картинки в формате .dll
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic_heavy.dll")
 	assert.NoError(t, err)
 	_, err = io.WriteString(smallImage, "fake-image-content-2")
@@ -177,7 +176,6 @@ func TestAddGames_MultipleFiles_UnsupportFormatFiles(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Ожидаем 400 ошибку с сообщением о недопустимом формате
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "Недопустимый формат файла!")
 }
@@ -189,13 +187,11 @@ func TestAddTranslate(t *testing.T) {
 	var requestBody bytes.Buffer
 	multiWriter := multipart.NewWriter(&requestBody)
 
-	//Текстовое поле
 	_ = multiWriter.WriteField("authorName", "Какой то автор")
 	_ = multiWriter.WriteField("source", "source_url")
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загрузка архива перевода
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -203,12 +199,9 @@ func TestAddTranslate(t *testing.T) {
 
 	multiWriter.Close()
 
-	//Тестовый id существующей игры
 	gameId := 1
-
 	url := fmt.Sprintf("/games/translate/%d", gameId)
 
-	//Создание запроса
 	req, err := http.NewRequest(http.MethodPost, url, &requestBody)
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", multiWriter.FormDataContentType())
@@ -219,24 +212,23 @@ func TestAddTranslate(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 	assert.Contains(t, w.Body.String(), "Успешно создано")
 
-	// Очистка
-	os.RemoveAll("uploads")
+	t.Cleanup(func() {
+		os.RemoveAll("uploads")
+	})
 }
 
-// Добавление перевода к игре, id является string
-func TestAddTranslate__WithStringId(t *testing.T) {
+// Добавление перевода к игре, id является string (исправлено имя функции)
+func TestAddTranslate_WithStringId(t *testing.T) {
 	r := setupTestRouter()
 
 	var requestBody bytes.Buffer
 	multiWriter := multipart.NewWriter(&requestBody)
 
-	//Текстовое поле
 	_ = multiWriter.WriteField("authorName", "Какой то автор")
 	_ = multiWriter.WriteField("source", "source_url")
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загрузка архива перевода
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -245,10 +237,8 @@ func TestAddTranslate__WithStringId(t *testing.T) {
 	multiWriter.Close()
 
 	gameId := "TestId1"
-
 	url := fmt.Sprintf("/games/translate/%s", gameId)
 
-	//Создание запроса
 	req, err := http.NewRequest(http.MethodPost, url, &requestBody)
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", multiWriter.FormDataContentType())
@@ -261,19 +251,17 @@ func TestAddTranslate__WithStringId(t *testing.T) {
 }
 
 // Добавление перевода к игре, но с несуществующим id игры
-func TestAddTranslate__InvalidGameId(t *testing.T) {
+func TestAddTranslate_InvalidGameId(t *testing.T) {
 	r := setupTestRouter()
 
 	var requestBody bytes.Buffer
 	multiWriter := multipart.NewWriter(&requestBody)
 
-	//Текстовое поле
 	_ = multiWriter.WriteField("authorName", "Какой то автор")
 	_ = multiWriter.WriteField("source", "source_url")
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загрузка архива перевода
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -282,10 +270,8 @@ func TestAddTranslate__InvalidGameId(t *testing.T) {
 	multiWriter.Close()
 
 	gameId := 9999999
-
 	url := fmt.Sprintf("/games/translate/%d", gameId)
 
-	//Создание запроса
 	req, err := http.NewRequest(http.MethodPost, url, &requestBody)
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", multiWriter.FormDataContentType())
@@ -294,24 +280,21 @@ func TestAddTranslate__InvalidGameId(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	//InMemoryGameRepo.CheckCreatedGame возвращает это сообщение
 	assert.Contains(t, w.Body.String(), "Игра была не найдена")
 }
 
-// Добавление перевода к игре, но с неизвестным форматом файла
-func TestAddTranslate__InvaliFileFormat(t *testing.T) {
+// Добавление перевода к игре, но с неизвестным форматом файла (исправлена опечатка в имени)
+func TestAddTranslate_InvalidFileFormat(t *testing.T) {
 	r := setupTestRouter()
 
 	var requestBody bytes.Buffer
 	multiWriter := multipart.NewWriter(&requestBody)
 
-	//Текстовое поле
 	_ = multiWriter.WriteField("authorName", "Какой то автор")
 	_ = multiWriter.WriteField("source", "source_url")
 	_ = multiWriter.WriteField("version", "0.1")
 	_ = multiWriter.WriteField("percentReady", "10")
 
-	//Загрузка файла в недопустимом формате
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.exe")
 	assert.NoError(t, err)
 	_, err = io.WriteString(zipFile, "fake-archive-content-1")
@@ -320,10 +303,8 @@ func TestAddTranslate__InvaliFileFormat(t *testing.T) {
 	multiWriter.Close()
 
 	gameId := 1
-
 	url := fmt.Sprintf("/games/translate/%d", gameId)
 
-	//Создание запроса
 	req, err := http.NewRequest(http.MethodPost, url, &requestBody)
 	assert.NoError(t, err)
 	req.Header.Set("Content-Type", multiWriter.FormDataContentType())

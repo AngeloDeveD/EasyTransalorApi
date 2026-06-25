@@ -2,12 +2,21 @@ package game
 
 import "github.com/gin-gonic/gin"
 
-func SetupGameRoutes(router *gin.Engine, handler *GameHandler) {
+func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.HandlerFunc) {
 
 	router.Static("/static", "./uploads")
 
-	router.GET("/cards", handler.GetCards)
-	router.GET("/games", handler.GetGames)
-	router.POST("/games/add", handler.AddGame)
-	router.POST("games/translate/:gameid", handler.AddTranslationInfo)
+	public := router.Group("")
+	{
+		public.GET("/cards", handler.GetCards)
+		public.GET("/games", handler.GetGames)
+		router.GET("/games/:gameid", handler.GetGameById)
+	}
+
+	private := router.Group("", authHandler)
+	{
+		private.POST("/games/add", handler.AddGame)
+		private.POST("games/translate/:gameid", handler.AddTranslationInfo)
+	}
+
 }

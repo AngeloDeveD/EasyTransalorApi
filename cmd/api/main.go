@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"myapi/internal/auth"
 	"myapi/internal/config"
 	"myapi/internal/database"
 	"myapi/internal/game"
@@ -29,11 +30,17 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
 
-	repo := game.NewSqlGameRepo(db)
+	//Настройка авторизацииgameRepo.NewJWTManager(cfg.JWTSecret)
+	authRepo := auth.NewSqlUserRepo(db)
+	jwtManager := auth.NewJWTManager(cfg.JWTSecret)
+	autoHandler := auth.NewAuthHandler(authRepo, jwtManager)
+	auth.SetupAuthRoutes(r, autoHandler)
 
-	handler := game.NewGameHandler(repo)
+	//Настройка игр
+	gameRepo := game.NewSqlGameRepo(db)
+	gameHandler := game.NewGameHandler(gameRepo)
 
-	game.SetupGameRoutes(r, handler)
+	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager))
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "API работает!"})

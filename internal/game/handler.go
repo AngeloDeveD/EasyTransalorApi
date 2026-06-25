@@ -48,6 +48,36 @@ func (h *GameHandler) GetGames(c *gin.Context) {
 	c.JSON(http.StatusAccepted, games)
 }
 
+//GET /games/:gameid
+/*Получение полной информации об игре по id*/
+func (h *GameHandler) GetGameById(c *gin.Context) {
+
+	//получение параметров с url
+	gameId_str := c.Param("gameid")
+
+	//Прверка на пустой gameid
+	if len(gameId_str) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Id игры не был получен"})
+		return
+	}
+
+	//Преобразование id в int64
+	gameid, err := strconv.ParseInt(gameId_str, 10, 64)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Полученный id не является числом"})
+		return
+	}
+
+	game, err := h.Repo.GetGameInfoById(gameid)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusAccepted, game)
+}
+
 //POST /games/add
 /*Добавление карточки игры*/
 func (h *GameHandler) AddGame(c *gin.Context) {
@@ -164,8 +194,8 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		return
 	}
 
-	//Преобразование id в int32
-	gameid, err := strconv.ParseInt(gameId_str, 10, 32)
+	//Преобразование id в int64
+	gameid, err := strconv.ParseInt(gameId_str, 10, 64)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Полученный id не является числом"})
