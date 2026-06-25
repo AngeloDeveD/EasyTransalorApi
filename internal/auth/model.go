@@ -8,3 +8,15 @@ type User struct {
 	PasswordHash string `json:"-" gorm:"not null"`
 	Role         string `json:"role" gorm:"default:author"` //Роль: либо автор либо админ
 }
+
+type RegisterRequest struct {
+	FirstName string `json:"firstName" binding:"required"`
+	LastName  string `json:"lastName" binding:"required"`
+	Nickname  string `json:"nickname" binding:"required"`
+	Password  string `json:"password" binding:"required"`
+}
+
+type LoginRequest struct {
+	Nickname string `json:"nickname" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
