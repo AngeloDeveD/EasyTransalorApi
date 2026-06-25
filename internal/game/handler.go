@@ -298,9 +298,32 @@ func (h *GameHandler) DeleteGame(c *gin.Context) {
 		return
 	}
 
+	//Получение информации об игре из бд
+	gameInfo, err := h.Repo.GetGameInfoById(gameId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра не найдена"})
+		return
+	}
+
+	//Удаление игры из бд
 	if err := h.Repo.DeleteGame(gameId); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка удаления игры"})
 		return
+	}
+
+	//Удаление файлов с диска
+
+	//Удаление архвов
+	folderPath := filepath.Join("uploads", "files", strconv.FormatInt(gameId, 10))
+	_ = os.RemoveAll(folderPath) //Если будет ошибка, то можно заигнорить
+
+	//Удаление иконок
+	if gameInfo.IconUrl != "" {
+		//Замена "/static/Icons" на "uploads/Icons"
+		filePathBig := strings.Replace(gameInfo.IconUrl, "/static/", "uploads/", 1)
+		filePathSmall := strings.Replace(filePathBig, "/Big/", "/Small/", 1)
+		_ = os.Remove(filePathBig)
+		_ = os.Remove(filePathSmall)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"error": "Игра вместе с переводами была удалена"})
@@ -326,9 +349,38 @@ func (h *GameHandler) DeleteTranslation(c *gin.Context) {
 		return
 	}
 
+	//Получение информации об игре для получения перевода и его пути к архиву
+	gameInfo, err := h.Repo.GetGameInfoById(gameId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра не найдена"})
+		return
+	}
+
+	var fileUrl string
+	found := false
+	for _, card := range gameInfo.TranslateCards {
+		if card.ID == translationId {
+			fileUrl = card.UrlToDownload
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Перевод не найден"})
+		return
+	}
+
+	//Удаление записи из БД
 	if err := h.Repo.DeleteTranslation(gameId, int64(translationId)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	//Удаление файла из диска
+	if fileUrl != "" {
+		filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
+		_ = os.Remove(filePath)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Перевод успешно удалён"})

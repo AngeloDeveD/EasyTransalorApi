@@ -19,4 +19,10 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.H
 		private.POST("games/translate/:gameid", handler.AddTranslationInfo)
 	}
 
+	adminOnly := router.Group("", authHandler, adminHandler)
+	{
+		adminOnly.DELETE("/games/:gameid", handler.DeleteGame)
+		adminOnly.DELETE("/games/translate/:gameid/:transid", handler.DeleteTranslation)
+	}
+
 }
