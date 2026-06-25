@@ -1,6 +1,7 @@
 package database
 
 import (
+	"myapi/internal/auth"
 	"myapi/internal/game"
 
 	"gorm.io/driver/sqlite"
@@ -24,6 +25,7 @@ func ConnectSqlite(dbName string) (*gorm.DB, error) {
 		&game.GameCard{},
 		&game.GameInfo{},
 		&game.TranslateCard{},
+		&auth.User{},
 	)
 
 	if err != nil {

@@ -7,29 +7,26 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Создаие и проверка токенов
-type JwtManager struct {
+type JWTManager struct {
 	secretKey string
 }
 
-func NewJWTManager(secretKey string) *JwtManager {
-	return &JwtManager{secretKey: secretKey}
+func NewJWTManager(secretKey string) *JWTManager {
+	return &JWTManager{secretKey: secretKey}
 }
 
-// Нагрузка, кооторая валяется внутри токена
 type Claims struct {
-	UserID int64  `json:"user_id"`
+	UserID int    `json:"user_id"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-// Генерация нового JWT токена
-func (m *JwtManager) GenerateToken(userID int64, role string) (string, error) {
+func (m *JWTManager) GenerateToken(userID int, role string) (string, error) {
 	claims := &Claims{
 		UserID: userID,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)), //Жизнь токена: 7 дней
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -38,19 +35,20 @@ func (m *JwtManager) GenerateToken(userID int64, role string) (string, error) {
 	return token.SignedString([]byte(m.secretKey))
 }
 
-// Проверка и доставание данных из токена
-func (m *JwtManager) ParseToken(tokenString string) (*Claims, error) {
+func (m *JWTManager) ParseToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("unexpected signing method")
+		}
 		return []byte(m.secretKey), nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
 	claims, ok := token.Claims.(*Claims)
-	if !ok || token.Valid {
-		return nil, errors.New("Невалидный токен")
+	if !ok || !token.Valid {
+		return nil, errors.New("невалидный токен")
 	}
 
 	return claims, nil

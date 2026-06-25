@@ -3,3 +3,4 @@ uploads/
 *.db-journal
 *.db-wal
 *.db-shm
+*.exe

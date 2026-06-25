@@ -180,6 +180,15 @@ func (r *InMemoryGameRepo) CheckCreatedGame(gameId int64) error {
 	return nil
 }
 
+func (r *InMemoryGameRepo) GetGameInfoById(gameId int64) (GameInfo, error) {
+	for _, game := range r.gameInfo {
+		if game.ID == int(gameId) {
+			return game, nil
+		}
+	}
+	return GameInfo{}, errors.New("Игра не найдена")
+}
+
 func (r *InMemoryGameRepo) AddTranslation(gameId int64, newTranslateCard TranslateCard) error {
 	status := false
 	for i := range r.gameInfo {

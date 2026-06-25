@@ -3,8 +3,9 @@ package config
 import "os"
 
 type Config struct {
-	Port   string
-	DBName string
+	Port      string
+	DBName    string
+	JWTSecret string
 }
 
 func Load() *Config {
@@ -18,5 +19,10 @@ func Load() *Config {
 		dbname = "app.db"
 	}
 
-	return &Config{Port: port, DBName: dbname}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "какая то залупа 3000"
+	}
+
+	return &Config{Port: port, DBName: dbname, JWTSecret: jwtSecret}
 }
