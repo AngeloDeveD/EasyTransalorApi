@@ -10,6 +10,7 @@ import (
 type UserRepository interface {
 	CreateUser(user *User) error
 	GetUserByNickname(nickname string) (*User, error)
+	GetUserById(id int) (*User, error)
 	GetUsers(limit int, offset int) ([]User, int64, error)
 	BlockUser(id int) error
 	UnblockUser(id int) error
@@ -31,6 +32,16 @@ func (r *SqlUserRepo) CreateUser(user *User) error {
 	}
 
 	return nil
+}
+
+func (r *SqlUserRepo) GetUserById(id int) (*User, error) {
+	var user User
+	err := r.db.First(&user, id).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
 
 func (r *SqlUserRepo) GetUserByNickname(nickname string) (*User, error) {

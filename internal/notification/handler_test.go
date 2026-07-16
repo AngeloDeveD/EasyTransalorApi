@@ -92,6 +92,15 @@ func makeRequest(r *gin.Engine, method, path string, body interface{}) *httptest
 	return w
 }
 
+// func (r *InMemoryUserRepo) GetUserByID(id int) (*User, error) {
+//     for i, u := range r.users {
+//         if u.ID == id {
+//             return &r.users[i], nil
+//         }
+//     }
+//     return nil, errors.New("пользователь не найден")
+// }
+
 // 1. Тест: Админ успешно создает глобальную рассылку
 func TestCreateGlobalNotification(t *testing.T) {
 	r := setupTestRouter(999) // 999 - условный ID админа

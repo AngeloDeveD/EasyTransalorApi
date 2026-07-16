@@ -1,5 +1,9 @@
 package game
 
+import (
+	"time"
+)
+
 type GameCard struct {
 	ID      int    `json:"id" gorm:"primaryKey;autoIncrement"`
 	Title   string `json:"title"`
@@ -15,16 +19,17 @@ type GameInfo struct {
 }
 
 type TranslateCard struct {
-	ID            int     `json:"id" gorm:"primaryKey;autoIncrement"`
-	AuthorName    string  `json:"authorName"`
-	AuthorId      int     `json:"authoreId"`
-	Source        string  `json:"source"`
-	Version       float64 `json:"version"`
-	PercentReady  float64 `json:"percentReady"`
-	UrlToDownload string  `json:"urlToDownload"`
-	FileSize      float64 `json:"fileSize"`
-	Status        string  `json:"status" gorm:"default:pending"` //pending, approved, rejected
-	GameInfoID    int     `json:"-"`
+	ID            int       `json:"id" gorm:"primaryKey;autoIncrement"`
+	AuthorName    string    `json:"authorName"`
+	AuthorId      int       `json:"authoreId"`
+	Source        string    `json:"source"`
+	Version       float64   `json:"version"`
+	PercentReady  float64   `json:"percentReady"`
+	UrlToDownload string    `json:"urlToDownload"`
+	FileSize      float64   `json:"fileSize"`
+	Status        string    `json:"status" gorm:"default:pending"` //pending, approved, rejected
+	GameInfoID    int       `json:"-"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 type CreateGameRequest struct {

@@ -3,19 +3,23 @@ package game
 import (
 	"errors"
 
+	"time"
+
 	"gorm.io/gorm"
 )
 
 type GameRepository interface {
 	GetAllCards() ([]GameCard, error)
-	//В будущем GetCardsByID	(id int) (GameInfo, error)
 	GetAllGamesInfo() ([]GameInfo, error)
+	GetTranslationByID(id int) (TranslateCard, error)
 	CreateNewGame(GameCard, GameInfo) error
 	AddTranslation(int, TranslateCard) error
 	CheckCreatedGame(int) error
 	GetGameInfoById(int) (GameInfo, error)
 	DeleteGame(gameId int) error
 	DeleteTranslation(gameId int, translationId int) error
+	GetOldRejectedTranslations(daysOld int) ([]TranslateCard, error)
+	DeleteRejectedTranslation(id int) error
 	GetModerationQueue(limit int, offset int) ([]TranslateCard, int, error)
 	ApproveTranslation(translationId int) error
 	RejectTranslation(translationId int) error
@@ -92,6 +96,15 @@ func (r *SqliteGameRepo) GetAllGamesInfo() ([]GameInfo, error) {
 	var games []GameInfo
 	result := r.db.Preload("TranslateCards").Find(&games)
 	return games, result.Error
+}
+
+func (r *SqliteGameRepo) GetTranslationByID(id int) (TranslateCard, error) {
+	var card TranslateCard
+	err := r.db.First(&card, id).Error
+	if err != nil {
+		return TranslateCard{}, err
+	}
+	return card, nil
 }
 
 func (r *SqliteGameRepo) CreateNewGame(newGameCard GameCard, newGameInfo GameInfo) error {
@@ -187,6 +200,19 @@ func (r *SqliteGameRepo) DeleteTranslation(gameId int, translationId int) error 
 	return nil
 }
 
+func (r *SqliteGameRepo) GetOldRejectedTranslations(daysOld int) ([]TranslateCard, error) {
+	var cards []TranslateCard
+	threshold := time.Now().AddDate(0, 0, -daysOld)
+
+	//Поиск переводов со статусом rejected
+	err := r.db.Where("status = ? AND created_at < ?", "rejected", threshold).Find(&cards).Error
+	return cards, err
+}
+
+func (r *SqliteGameRepo) DeleteRejectedTranslation(id int) error {
+	return r.db.Unscoped().Delete(&TranslateCard{}, id).Error
+}
+
 func (r *SqliteGameRepo) GetModerationQueue(limit int, offset int) ([]TranslateCard, int, error) {
 	var translations []TranslateCard
 	var totalCount int
@@ -216,8 +242,6 @@ func (r *SqliteGameRepo) RejectTranslation(translationId int) error {
 
 /*Для тестов*/
 
-//TODO: Добавить заглушки для тестов
-
 func (r *InMemoryGameRepo) GetAllCards() ([]GameCard, error) {
 	// Старые захардкоженные данные
 	return r.gameCard, nil
@@ -225,6 +249,17 @@ func (r *InMemoryGameRepo) GetAllCards() ([]GameCard, error) {
 
 func (r *InMemoryGameRepo) GetAllGamesInfo() ([]GameInfo, error) {
 	return r.gameInfo, nil
+}
+
+func (r *InMemoryGameRepo) GetTranslationByID(id int) (TranslateCard, error) {
+	for _, game := range r.gameInfo {
+		for _, card := range game.TranslateCards {
+			if card.ID == id {
+				return card, nil
+			}
+		}
+	}
+	return TranslateCard{}, errors.New("перевод не найден")
 }
 
 func (r *InMemoryGameRepo) CreateNewGame(newGameCard GameCard, newGameInfo GameInfo) error {

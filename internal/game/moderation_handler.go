@@ -87,15 +87,17 @@ func (h *ModerationHandler) Reject(c *gin.Context) {
 		return
 	}
 
-	//TODO: отправка сообщению пользователю по ID
-	/*
-		authorID := h.GameRepo.GetTranslationAuthorID(transId)
-		notif := &notification.Notification{
-			UserID: authorID,
-			Title: "Ваше перевод был отклонён",
-			Message: "Ваш перевод (ID: " + transIdStr + ") был отклонён. Причина: " + req.Reason,
-		}
-		h.NotifRepo.Create(notif)
-	*/
-	c.JSON(http.StatusOK, gin.H{"message": "Перевод отклонён"})
+	translation, err := h.GameRepo.GetTranslationByID(transId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось найти перевод для отправки уведомления"})
+		return
+	}
+
+	notif := &notification.Notification{
+		UserID:  translation.AuthorId,
+		Title:   "Ваше перевод был отклонён",
+		Message: "Ваш перевод (ID: " + transIdStr + ") был отклонён. Причина: " + req.Reason,
+	}
+	h.NotifRepo.Create(notif)
+	c.JSON(http.StatusOK, gin.H{"message": "Перевод отклонён. Автору отправлено уведомление."})
 }
