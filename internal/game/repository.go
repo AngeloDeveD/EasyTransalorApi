@@ -17,6 +17,9 @@ type GameRepository interface {
 	GetGameInfoById(int64) (GameInfo, error)
 	DeleteGame(gameId int64) error
 	DeleteTranslation(gameId int64, translationId int64) error
+	GetModerationQueue(limit int, offset int) ([]TranslateCard, int64, error)
+	ApproveTranslation(translationId int) error
+	RejectTranslation(translationId int) error
 }
 
 type SqliteGameRepo struct {
@@ -185,19 +188,32 @@ func (r *SqliteGameRepo) DeleteTranslation(gameId int64, translationId int64) er
 	return nil
 }
 
-// func (r *SqliteGameRepo) CheckTranslation(gameId int64, translationId int64) error {
-// 	result := r.db.Where("id = ? AND game_info_id = ?", translationId, gameId)
+func (r *SqliteGameRepo) GetModerationQueue(limit int, offset int) ([]TranslateCard, int64, error) {
+	var translations []TranslateCard
+	var totalCount int64
 
-// 	if result.Error != nil {
-// 		return result.Error
-// 	}
+	err := r.db.Model(&TranslateCard{}).Where("status = ?", "pending").Limit(limit).Offset(offset).Order("id desc").Find(&translations).Error
 
-// 	if result.RowsAffected == 0 {
-// 		return errors.New("Перевод либо не найден либо не принадлежит этой игре")
-// 	}
+	return translations, totalCount, err
+}
 
-// 	return nil
-// }
+func (r *SqliteGameRepo) ApproveTranslation(translationId int) error {
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", "approved")
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+
+	return result.Error
+}
+
+func (r *SqliteGameRepo) RejectTranslation(translationId int) error {
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", "reject")
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+
+	return result.Error
+}
 
 /*Для тестов*/
 

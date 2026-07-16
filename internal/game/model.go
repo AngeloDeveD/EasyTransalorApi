@@ -17,6 +17,7 @@ type GameInfo struct {
 type TranslateCard struct {
 	ID            int64   `json:"id" gorm:"primaryKey;autoIncrement"`
 	AuthorName    string  `json:"authorName"`
+	AuthorId      int     `json:"authoreId"`
 	Source        string  `json:"source"`
 	Version       float64 `json:"version"`
 	PercentReady  float64 `json:"percentReady"`

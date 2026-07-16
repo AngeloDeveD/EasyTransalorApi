@@ -257,6 +257,12 @@ func (h *GameHandler) AddGame(c *gin.Context) {
 func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	var req CreateTraslateRequest
 
+	userID, exist := c.Get("userID")
+	if !exist {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь не авторизован"})
+		return
+	}
+
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка получения текстовых данных"})
 		return
@@ -331,11 +337,13 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	trasnalteInfo := TranslateCard{
 		ID:            int64(uuid.New().ID()),
 		AuthorName:    req.AuthorName,
+		AuthorId:      userID.(int),
 		Source:        req.Source,
 		Version:       req.Version,
 		PercentReady:  req.PercentReady,
 		UrlToDownload: file_url,
 		FileSize:      roundedSize,
+		Status:        "pending",
 	}
 
 	saveTranslationInfo := h.Repo.AddTranslation(gameid, trasnalteInfo)

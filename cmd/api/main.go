@@ -75,8 +75,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	//Настройка игр
 	gameRepo := game.NewSqlGameRepo(db)
 	gameHandler := game.NewGameHandler(gameRepo)
-
 	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
+
+	moderationHandler := game.NewModerationHandler(gameRepo, authRepo)
+	game.SetupModerationRoutes(r, moderationHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "API работает!"})
