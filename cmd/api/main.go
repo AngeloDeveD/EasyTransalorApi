@@ -68,6 +68,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	autoHandler := auth.NewAuthHandler(authRepo, jwtManager)
 	auth.SetupAuthRoutes(r, autoHandler)
 
+	//Настройка админки
+	adminHandler := auth.NewAdminHandler(authRepo)
+	auth.SetupAdminRoutes(r, adminHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
+
 	//Настройка игр
 	gameRepo := game.NewSqlGameRepo(db)
 	gameHandler := game.NewGameHandler(gameRepo)
