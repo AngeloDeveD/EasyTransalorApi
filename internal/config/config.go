@@ -3,8 +3,18 @@ package config
 import "os"
 
 type Config struct {
-	Port      string
-	DBName    string
+	Port   string
+	DBType string // "sqlite" или "postgres"
+
+	// Для SQLite
+	DBName string
+
+	// Для PostgreSQL
+	DBHost string
+	DBPort string
+	DBUser string
+	DBPass string
+
 	JWTSecret string
 }
 
@@ -14,15 +24,50 @@ func Load() *Config {
 		port = "8080"
 	}
 
-	dbname := os.Getenv("DB_NAME")
-	if dbname == "" {
-		dbname = "app.db"
+	dbType := os.Getenv("DB_TYPE")
+	if dbType == "" {
+		dbType = "sqlite"
+	} // По умолчанию используем SQLite
+
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "app.db"
+	}
+
+	// Дефолтные значения для локального постгреса
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+
+	dbPort := os.Getenv("DB_PORT")
+	if dbPort == "" {
+		dbPort = "5432"
+	}
+
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "postgres"
+	}
+
+	dbPass := os.Getenv("DB_PASS")
+	if dbPass == "" {
+		dbPass = "secret"
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "какая то залупа 3000"
+		jwtSecret = "super_secret_dev_key_123"
 	}
 
-	return &Config{Port: port, DBName: dbname, JWTSecret: jwtSecret}
+	return &Config{
+		Port:      port,
+		DBType:    dbType,
+		DBName:    dbName,
+		DBHost:    dbHost,
+		DBPort:    dbPort,
+		DBUser:    dbUser,
+		DBPass:    dbPass,
+		JWTSecret: jwtSecret,
+	}
 }

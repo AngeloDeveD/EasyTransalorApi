@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # 1. База данных PostgreSQL
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: translations_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Эта проверка ждет, пока БД не будет готова принимать запросы
+      test: ["CMD-SHELL", "pg_isready -U postgres -d translations_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Твое Go-приложение
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Настройки для Go-приложения
+      - APP_PORT=8080
+      - DB_TYPE=postgres
+      - DB_HOST=db       # Имя хоста совпадает с именем сервиса db выше!
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASS=secret
+      - DB_NAME=translations_db
+      - JWT_SECRET=super_duper_secret_prod_key_998
+    volumes:
+      # Сохраняем загруженные файлы на твоем компе, чтобы они не пропали при остановке контейнера
+      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy # Ждем, пока БД скажет, что готова
+
+# Объявляем постоянный том для базы данных
+volumes:
+  postgres_data:

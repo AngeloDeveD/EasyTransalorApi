@@ -32,7 +32,7 @@ func main() {
 // makeAdmin выдаёт права администратора по никнейму, который был передан при запуске программы
 // Пример: app.exe --make-admin yapidoras2012
 func makeAdmin(cfg *config.Config, nickname string) {
-	db, err := database.ConnectSqlite(cfg.DBName)
+	db, err := database.ConnectDB(cfg)
 	if err != nil {
 		log.Fatalf("Ошибка БД: %v", err)
 	}
@@ -57,7 +57,7 @@ func makeAdmin(cfg *config.Config, nickname string) {
 func setupRouter(cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
-	db, err := database.ConnectSqlite(cfg.DBName)
+	db, err := database.ConnectDB(cfg)
 	if err != nil {
 		log.Fatalf("Ошибка подключения к БД: %v", err)
 	}
