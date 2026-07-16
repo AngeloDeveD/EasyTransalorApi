@@ -27,11 +27,11 @@ func NewGameHandler(repo GameRepository) *GameHandler {
 
 // Проверка id перевода и игры
 // Проверяет на отсутвие символов и на то, чтобы в id были только числа
-func CheckGameId(gameId string) (int64, error) {
+func CheckGameId(gameId string) (int, error) {
 	if len(gameId) == 0 {
 		return -1, errors.New("Id игры не был получен")
 	}
-	gameid_int, err := strconv.ParseInt(gameId, 10, 64)
+	gameid_int, err := strconv.Atoi(gameId)
 
 	if err != nil {
 		return -1, errors.New("Полученный id не является числом")
@@ -308,7 +308,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	}
 
 	// uploads/files/"gameid"
-	folderPath := filepath.Join("uploads", "files", strconv.FormatInt(gameid, 10))
+	folderPath := filepath.Join("uploads", "files", strconv.Itoa(gameid))
 
 	// Убедимся, что папка существует! Иначе SaveUploadedFile упадет с ошибкой
 	if err := os.MkdirAll(folderPath, os.ModePerm); err != nil {
@@ -325,7 +325,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	}
 
 	//Для url-скачивания: /static/files/"gameid"
-	file_url := filepath.Join("/static", "files", strconv.FormatInt(gameid, 10), newFile)
+	file_url := filepath.Join("/static", "files", strconv.Itoa(gameid), newFile)
 
 	//Для windows
 	file_url = strings.ReplaceAll(file_url, `\`, "/")
@@ -335,7 +335,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	roundedSize := math.Round(sizeInMb*100) / 100
 
 	trasnalteInfo := TranslateCard{
-		ID:            int64(uuid.New().ID()),
+		ID:            int(uuid.New().ID()),
 		AuthorName:    req.AuthorName,
 		AuthorId:      userID.(int),
 		Source:        req.Source,
@@ -368,7 +368,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 /*Удаление игры*/
 func (h *GameHandler) DeleteGame(c *gin.Context) {
 	gameIdStr := c.Param("gameid")
-	gameId, err := strconv.ParseInt(gameIdStr, 10, 64)
+	gameId, err := strconv.Atoi(gameIdStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Полученный id не является числом"})
 		return
@@ -390,7 +390,7 @@ func (h *GameHandler) DeleteGame(c *gin.Context) {
 	//Удаление файлов с диска
 
 	//Удаление архвов
-	folderPath := filepath.Join("uploads", "files", strconv.FormatInt(gameId, 10))
+	folderPath := filepath.Join("uploads", "files", strconv.Itoa(gameId))
 	_ = os.RemoveAll(folderPath) //Если будет ошибка, то можно заигнорить
 
 	//Удаление иконок
@@ -446,7 +446,7 @@ func (h *GameHandler) DeleteTranslation(c *gin.Context) {
 	}
 
 	//Удаление записи из БД
-	if err := h.Repo.DeleteTranslation(gameId, int64(translationId)); err != nil {
+	if err := h.Repo.DeleteTranslation(gameId, translationId); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

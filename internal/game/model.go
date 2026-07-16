@@ -15,7 +15,7 @@ type GameInfo struct {
 }
 
 type TranslateCard struct {
-	ID            int64   `json:"id" gorm:"primaryKey;autoIncrement"`
+	ID            int     `json:"id" gorm:"primaryKey;autoIncrement"`
 	AuthorName    string  `json:"authorName"`
 	AuthorId      int     `json:"authoreId"`
 	Source        string  `json:"source"`
@@ -28,7 +28,7 @@ type TranslateCard struct {
 }
 
 type CreateGameRequest struct {
-	Title string `json:"title"`
+	Title string `form:"Title" binding:"required"`
 }
 
 type CreateTraslateRequest struct {

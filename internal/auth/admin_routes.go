@@ -7,7 +7,7 @@ func SetupAdminRoutes(r *gin.Engine, h *AdminHandler, authMiddleware gin.Handler
 	{
 		adminGroup.GET("/users", h.GetUsers)
 		adminGroup.PATCH("/users/:userid/block", h.BlockUser)
-		adminGroup.PATCH("/users/userid/unblock", h.UnblockUser)
+		adminGroup.PATCH("/users/:userid/unblock", h.UnblockUser)
 		adminGroup.PATCH("/users/:userid/warn", h.WarnUser)
 		adminGroup.PATCH("/users/:userid/unwarn", h.UnwarnUser)
 

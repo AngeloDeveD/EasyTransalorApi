@@ -15,25 +15,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Для имитации больших файлов
 var heavyFileBytes = make([]byte, 5*1024*1024+1)
 
-// Сборка роутера с InMemoryGameRepo (изолированный репозиторий для каждого теста)
 func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	repo := NewInMemoryGameRepo()
 	handler := NewGameHandler(repo)
 
-	// Создаем заглушку для Middleware авторизации.
-	// Она просто пропускает запрос дальше, как будто пользователь авторизован.
+	// Заглушки для middleware
 	dummyAuthMiddleware := func(c *gin.Context) {
-		c.Set("userID", 1) // Имитируем, что пришел юзер с ID 1
+		c.Set("userID", 1)
+		c.Set("role", "author")
 		c.Next()
 	}
+	dummyAdminMiddleware := func(c *gin.Context) {
+		c.Next() // В тестах игр admim middleware всегда пропускает
+	}
 
-	// Передаем 3 аргумента, как теперь требует функция
-	SetupGameRoutes(r, handler, dummyAuthMiddleware)
+	// Передаем 4 аргумента
+	SetupGameRoutes(r, handler, dummyAuthMiddleware, dummyAdminMiddleware)
 	return r
 }
 
@@ -314,4 +315,78 @@ func TestAddTranslate_InvalidFileFormat(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, w.Body.String(), "Недопустимый формат файла!")
+}
+
+// Получение игры по строковому ID (не числу)
+func TestGetGameById_InvalidStringId(t *testing.T) {
+	router := setupTestRouter()
+
+	req, _ := http.NewRequest("GET", "/games/NotANumber", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Полученный id не является числом")
+}
+
+// Получение игры по несуществующему ID
+func TestGetGameById_NonExistentId(t *testing.T) {
+	router := setupTestRouter()
+
+	req, _ := http.NewRequest("GET", "/games/9999", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), "Игра не найдена")
+}
+
+// Добавление игры без указания Title
+func TestAddGame_MissingTitle(t *testing.T) {
+	r := setupTestRouter()
+
+	var requestBody bytes.Buffer
+	multiWriter := multipart.NewWriter(&requestBody)
+
+	// Намеренно не пишем multiWriter.WriteField("Title", ...)
+
+	bigImage, _ := multiWriter.CreateFormFile("big_pic", "big_pic.jpg")
+	io.WriteString(bigImage, "fake")
+
+	smallImage, _ := multiWriter.CreateFormFile("small_pic", "small_pic.png")
+	io.WriteString(smallImage, "fake")
+
+	multiWriter.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, "/games/add", &requestBody)
+	req.Header.Set("Content-Type", multiWriter.FormDataContentType())
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+// Удаление игры
+func TestDeleteGame(t *testing.T) {
+	r := setupTestRouter()
+
+	// В InMemoryGameRepo у нас есть игра с ID 1
+	req, _ := http.NewRequest(http.MethodDelete, "/games/1", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), "была удалена")
+}
+
+// Удаление несуществующей игры
+func TestDeleteGame_NonExistent(t *testing.T) {
+	r := setupTestRouter()
+
+	req, _ := http.NewRequest(http.MethodDelete, "/games/9999", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
