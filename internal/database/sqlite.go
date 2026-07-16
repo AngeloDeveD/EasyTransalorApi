@@ -26,6 +26,7 @@ func ConnectSqlite(dbName string) (*gorm.DB, error) {
 		&game.GameInfo{},
 		&game.TranslateCard{},
 		&auth.User{},
+		&auth.Warning{},
 	)
 
 	if err != nil {
