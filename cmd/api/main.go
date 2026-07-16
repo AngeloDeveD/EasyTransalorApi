@@ -7,6 +7,7 @@ import (
 	"myapi/internal/config"
 	"myapi/internal/database"
 	"myapi/internal/game"
+	"myapi/internal/notification"
 	"os"
 
 	"net/http"
@@ -77,7 +78,11 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	gameHandler := game.NewGameHandler(gameRepo)
 	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
-	moderationHandler := game.NewModerationHandler(gameRepo, authRepo)
+	notifRepo := notification.NewSqlNotificationRepo(db)
+	notifHandler := notification.NewNotificationHandler(notifRepo)
+	notification.SetupNotificationRoutes(r, notifHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
+
+	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo)
 	game.SetupModerationRoutes(r, moderationHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
 	r.GET("/", func(c *gin.Context) {
