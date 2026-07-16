@@ -42,7 +42,7 @@ func makeAdmin(cfg *config.Config, nickname string) {
 	result := db.Where("nickname = ?", nickname).First(&user)
 
 	if result.Error != nil {
-		log.Fatalf("Пользотватель '%s' не найден!", nickname)
+		log.Fatalf("Пользователь '%s' не найден!", nickname)
 	}
 
 	//Обновление роли

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -22,6 +23,21 @@ type GameHandler struct {
 // Конструктор для создания хэндлера
 func NewGameHandler(repo GameRepository) *GameHandler {
 	return &GameHandler{Repo: repo}
+}
+
+// Проверка id перевода и игры
+// Проверяет на отсутвие символов и на то, чтобы в id были только числа
+func CheckGameId(gameId string) (int64, error) {
+	if len(gameId) == 0 {
+		return -1, errors.New("Id игры не был получен")
+	}
+	gameid_int, err := strconv.ParseInt(gameId, 10, 64)
+
+	if err != nil {
+		return -1, errors.New("Полученный id не является числом")
+	}
+
+	return gameid_int, nil
 }
 
 // GET /cards
@@ -53,19 +69,10 @@ func (h *GameHandler) GetGames(c *gin.Context) {
 func (h *GameHandler) GetGameById(c *gin.Context) {
 
 	//получение параметров с url
-	gameId_str := c.Param("gameid")
-
-	//Прверка на пустой gameid
-	if len(gameId_str) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Id игры не был получен"})
-		return
-	}
-
-	//Преобразование id в int64
-	gameid, err := strconv.ParseInt(gameId_str, 10, 64)
+	gameid, err := CheckGameId(c.Param("gameid"))
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Полученный id не является числом"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -76,6 +83,76 @@ func (h *GameHandler) GetGameById(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusAccepted, game)
+}
+
+// GET /download/:gameid/:translid
+/*Устанавливаем архив файла с переводом*/
+func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
+
+	//Получение и проверка данных
+
+	gameId, err := CheckGameId(c.Param("gameid"))
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	transid, err := CheckGameId(c.Param("translid"))
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//Проверка на существование игры в бд
+	if err := h.Repo.CheckCreatedGame(gameId); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра не найдена!"})
+		return
+	}
+
+	//Поиск местоположение файла с переводом
+
+	gameInfo, err := h.Repo.GetGameInfoById(gameId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	var fileUrl string
+	var author string
+	found := false
+	for _, card := range gameInfo.TranslateCards {
+		if card.ID == transid {
+			fileUrl = card.UrlToDownload
+			author = card.AuthorName
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Перевод не найден"})
+		return
+	}
+
+	//Отправка файла пользователю
+	if fileUrl != "" {
+		filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
+
+		rawName := gameInfo.Title + "_" + author + filepath.Ext(fileUrl)
+
+		filename := strings.ReplaceAll(rawName, " ", "_")
+		filename = strings.ReplaceAll(filename, "+", "_")
+
+		fmt.Println("Попытка отдать файл:", filePath)
+		c.FileAttachment(filePath, filename)
+
+		//c.File(filePath)
+		return
+	}
+
+	c.JSON(http.StatusInternalServerError, gin.H{"error": "URL файла пуст!"})
 }
 
 //POST /games/add
@@ -186,19 +263,10 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	}
 
 	//получение параметров с url
-	gameId_str := c.Param("gameid")
-
-	//Прверка на пустой gameid
-	if len(gameId_str) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Id игры не был получен"})
-		return
-	}
-
-	//Преобразование id в int64
-	gameid, err := strconv.ParseInt(gameId_str, 10, 64)
+	gameid, err := CheckGameId(c.Param("gameid"))
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Полученный id не является числом"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -261,7 +329,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	roundedSize := math.Round(sizeInMb*100) / 100
 
 	trasnalteInfo := TranslateCard{
-		ID:            int(uuid.New().ID()),
+		ID:            int64(uuid.New().ID()),
 		AuthorName:    req.AuthorName,
 		Source:        req.Source,
 		Version:       req.Version,
@@ -332,20 +400,18 @@ func (h *GameHandler) DeleteGame(c *gin.Context) {
 //DELETE /games/translate/:gameid/:transid
 /*Удаление перевода из игры*/
 func (h *GameHandler) DeleteTranslation(c *gin.Context) {
-	gameStrId := c.Param("gameid")
-	translationStrId := c.Param("transid")
 
-	gameId, err := strconv.ParseInt(gameStrId, 10, 64)
+	gameId, err := CheckGameId(c.Param("gameid"))
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID игры не является числом"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	translationId, err := strconv.Atoi(translationStrId)
+	translationId, err := CheckGameId("transid")
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID перевода не является числом"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

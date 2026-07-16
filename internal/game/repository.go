@@ -13,6 +13,7 @@ type GameRepository interface {
 	CreateNewGame(GameCard, GameInfo) error
 	AddTranslation(int64, TranslateCard) error
 	CheckCreatedGame(int64) error
+	// CheckTranslation(int64, int64) error
 	GetGameInfoById(int64) (GameInfo, error)
 	DeleteGame(gameId int64) error
 	DeleteTranslation(gameId int64, translationId int64) error
@@ -183,6 +184,20 @@ func (r *SqliteGameRepo) DeleteTranslation(gameId int64, translationId int64) er
 
 	return nil
 }
+
+// func (r *SqliteGameRepo) CheckTranslation(gameId int64, translationId int64) error {
+// 	result := r.db.Where("id = ? AND game_info_id = ?", translationId, gameId)
+
+// 	if result.Error != nil {
+// 		return result.Error
+// 	}
+
+// 	if result.RowsAffected == 0 {
+// 		return errors.New("Перевод либо не найден либо не принадлежит этой игре")
+// 	}
+
+// 	return nil
+// }
 
 /*Для тестов*/
 
