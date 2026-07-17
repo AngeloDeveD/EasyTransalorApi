@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"myapi/internal/auth"
+	"myapi/internal/chat"
 	"myapi/internal/config"
 	"myapi/internal/database"
 	"myapi/internal/game"
@@ -82,6 +83,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	gameRepo := game.NewSqlGameRepo(db)
 	gameHandler := game.NewGameHandler(gameRepo)
 	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
+
+	chatHub := chat.NewHub()
+	chatHandler := chat.NewChatHandler(chatHub)
+	chat.SetupChatRouter(r, chatHandler, auth.AuthMiddleware(jwtManager))
 
 	//Запуск очистителя
 	game.StartCleaner(gameRepo)
