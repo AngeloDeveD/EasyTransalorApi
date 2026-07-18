@@ -87,31 +87,25 @@ func (h *GameHandler) GetGameById(c *gin.Context) {
 
 // GET /download/:gameid/:translid
 /*Устанавливаем архив файла с переводом*/
+// GET /download/:gameid/:translid
+/*Устанавливаем архив файла с переводом*/
 func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
-
-	//Получение и проверка данных
-
 	gameId, err := CheckGameId(c.Param("gameid"))
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	transid, err := CheckGameId(c.Param("translid"))
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	//Проверка на существование игры в бд
 	if err := h.Repo.CheckCreatedGame(gameId); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра не найдена!"})
 		return
 	}
-
-	//Поиск местоположение файла с переводом
 
 	gameInfo, err := h.Repo.GetGameInfoById(gameId)
 	if err != nil {
@@ -122,8 +116,17 @@ func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
 	var fileUrl string
 	var author string
 	found := false
+
 	for _, card := range gameInfo.TranslateCards {
 		if card.ID == transid {
+			if card.Status != "approved" {
+				// Получениие роли пользователя
+				role, exists := c.Get("role")
+				if !exists || role != "admin" {
+					c.JSON(http.StatusForbidden, gin.H{"error": "Доступ закрыт. Файл находится на модерации."})
+					return
+				}
+			}
 			fileUrl = card.UrlToDownload
 			author = card.AuthorName
 			found = true
@@ -136,19 +139,15 @@ func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
 		return
 	}
 
-	//Отправка файла пользователю
 	if fileUrl != "" {
 		filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
 
 		rawName := gameInfo.Title + "_" + author + filepath.Ext(fileUrl)
-
 		filename := strings.ReplaceAll(rawName, " ", "_")
 		filename = strings.ReplaceAll(filename, "+", "_")
 
 		fmt.Println("Попытка отдать файл:", filePath)
 		c.FileAttachment(filePath, filename)
-
-		//c.File(filePath)
 		return
 	}
 
