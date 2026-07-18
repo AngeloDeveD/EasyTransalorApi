@@ -84,9 +84,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	gameHandler := game.NewGameHandler(gameRepo)
 	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
+	chatRepo := chat.NewSqliteChatRepo(db)
 	chatHub := chat.NewHub()
-	chatHandler := chat.NewChatHandler(chatHub)
-	chat.SetupChatRouter(r, chatHandler, auth.AuthMiddleware(jwtManager))
+	chatHandler := chat.NewChatHandler(chatHub, chatRepo, []byte(cfg.EncryptKey))
+	chat.SetupChatRoutes(r, chatHandler, auth.AuthMiddleware(jwtManager))
 
 	//Запуск очистителя
 	game.StartCleaner(gameRepo)

@@ -3,7 +3,7 @@ package chat
 import "gorm.io/gorm"
 
 type ChatRepository interface {
-	SaveMesage(msg *ChatMessage) error
+	SaveMessage(msg *ChatMessage) error
 	GetHistory(user1ID int, user2ID int) ([]ChatMessage, error)
 }
 
