@@ -5,17 +5,19 @@ import (
 	"strconv"
 
 	"myapi/internal/auth"
+	"myapi/internal/notification"
 
 	"github.com/gin-gonic/gin"
 )
 
 type ModerationHandler struct {
-	GameRepo GameRepository
-	UserRepo auth.UserRepository
+	GameRepo  GameRepository
+	UserRepo  auth.UserRepository
+	NotifRepo notification.NotificationRepository
 }
 
-func NewModerationHandler(gameRepo GameRepository, userRepo auth.UserRepository) *ModerationHandler {
-	return &ModerationHandler{GameRepo: gameRepo, UserRepo: userRepo}
+func NewModerationHandler(gameRepo GameRepository, userRepo auth.UserRepository, notifRepo notification.NotificationRepository) *ModerationHandler {
+	return &ModerationHandler{GameRepo: gameRepo, UserRepo: userRepo, NotifRepo: notifRepo}
 }
 
 // GET /api/admin/moderation?page=1
@@ -85,5 +87,17 @@ func (h *ModerationHandler) Reject(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Перевод отклонён"})
+	translation, err := h.GameRepo.GetTranslationByID(transId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось найти перевод для отправки уведомления"})
+		return
+	}
+
+	notif := &notification.Notification{
+		UserID:  translation.AuthorId,
+		Title:   "Ваше перевод был отклонён",
+		Message: "Ваш перевод (ID: " + transIdStr + ") был отклонён. Причина: " + req.Reason,
+	}
+	h.NotifRepo.Create(notif)
+	c.JSON(http.StatusOK, gin.H{"message": "Перевод отклонён. Автору отправлено уведомление."})
 }

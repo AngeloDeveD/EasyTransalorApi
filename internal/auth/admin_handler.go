@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"myapi/internal/notification"
 	"net/http"
 	"strconv"
 
@@ -8,11 +9,12 @@ import (
 )
 
 type AdminHandler struct {
-	Repo UserRepository
+	Repo      UserRepository
+	NotifRepo notification.NotificationRepository
 }
 
-func NewAdminHandler(repo UserRepository) *AdminHandler {
-	return &AdminHandler{Repo: repo}
+func NewAdminHandler(repo UserRepository, notifRepo notification.NotificationRepository) *AdminHandler {
+	return &AdminHandler{Repo: repo, NotifRepo: notifRepo}
 }
 
 // Структура для принятия варна
@@ -108,7 +110,29 @@ func (h *AdminHandler) WarnUser(c *gin.Context) {
 		return
 	}
 
-	//TODO: GetUserByID, далее проверка на 3 варна, и если true -> BlockUser()
+	//Отправка сообщения о варне
+	notif := &notification.Notification{
+		UserID:  id,
+		Title:   "Вам выдано предупреждение",
+		Message: "Причина: " + req.Reason,
+	}
+	h.NotifRepo.Create(notif)
+
+	//проверка кол-ва варнов. Если больше трёх - бан
+	user, err := h.Repo.GetUserById(id)
+	if err == nil && user.WarnCount >= 3 {
+		h.Repo.BlockUser(id)
+
+		//Уведомление пользователя о блокировке
+		banNotif := &notification.Notification{
+			UserID:  id,
+			Title:   "Ваш аккаунт заблокирован",
+			Message: "Ваш аккаунт заблокирован за нарушения. Теперь вам можно только устанавливать файлы",
+		}
+		h.NotifRepo.Create(banNotif)
+		c.JSON(http.StatusOK, gin.H{"message": "Варн выдан. Пользователь заблокирован за 3 нарушения."})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Варн успешно выдан"})
 }

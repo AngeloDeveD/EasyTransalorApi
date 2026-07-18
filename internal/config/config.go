@@ -15,7 +15,8 @@ type Config struct {
 	DBUser string
 	DBPass string
 
-	JWTSecret string
+	JWTSecret  string
+	EncryptKey string
 }
 
 func Load() *Config {
@@ -59,15 +60,20 @@ func Load() *Config {
 	if jwtSecret == "" {
 		jwtSecret = "super_secret_dev_key_123"
 	}
+	encryptKey := os.Getenv("EncryptKey")
+	if encryptKey == "" {
+		encryptKey = "12345678901234567890123456789012"
+	}
 
 	return &Config{
-		Port:      port,
-		DBType:    dbType,
-		DBName:    dbName,
-		DBHost:    dbHost,
-		DBPort:    dbPort,
-		DBUser:    dbUser,
-		DBPass:    dbPass,
-		JWTSecret: jwtSecret,
+		Port:       port,
+		DBType:     dbType,
+		DBName:     dbName,
+		DBHost:     dbHost,
+		DBPort:     dbPort,
+		DBUser:     dbUser,
+		DBPass:     dbPass,
+		JWTSecret:  jwtSecret,
+		EncryptKey: encryptKey,
 	}
 }

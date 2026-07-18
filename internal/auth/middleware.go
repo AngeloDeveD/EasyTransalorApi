@@ -9,22 +9,26 @@ import (
 
 func AuthMiddleware(jwt *JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		tokenString := ""
+
+		//Попытка взять токен из заголовка
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if len(strings.Split(authHeader, " ")) == 2 {
+			tokenString = strings.Split(authHeader, " ")[1]
+		} else {
+			//Если в заголовке НЕТ токена, поиск его в URL (?token=...)
+			//Это нужно для WebSocket, так как браузеры не могут отправить заголовок при WS-подключении
+			tokenString = c.Query("token")
+		}
+
+		//Если токена вообще нигде нет - отфутболивание
+		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			c.Abort()
 			return
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный формат авторизации"})
-			c.Abort()
-			return
-		}
-
-		tokenString := parts[1]
-
+		// Проверка токена
 		claims, err := jwt.ParseToken(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Невалидный или истекший токен"})
@@ -32,6 +36,7 @@ func AuthMiddleware(jwt *JWTManager) gin.HandlerFunc {
 			return
 		}
 
+		// Добавление данных юзера в контекст
 		c.Set("userID", claims.UserID)
 		c.Set("role", claims.Role)
 

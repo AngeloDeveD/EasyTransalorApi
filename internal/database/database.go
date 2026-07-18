@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"myapi/internal/auth"
+	"myapi/internal/chat"
 	"myapi/internal/config"
 	"myapi/internal/game"
+	"myapi/internal/notification"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -43,6 +45,8 @@ func ConnectDB(cfg *config.Config) (*gorm.DB, error) {
 		&game.GameCard{},
 		&game.GameInfo{},
 		&game.TranslateCard{},
+		&notification.Notification{},
+		&chat.ChatMessage{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка миграции БД: %w", err)

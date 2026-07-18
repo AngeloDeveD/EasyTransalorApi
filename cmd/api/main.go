@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"myapi/internal/auth"
+	"myapi/internal/chat"
 	"myapi/internal/config"
 	"myapi/internal/database"
 	"myapi/internal/game"
+	"myapi/internal/notification"
 	"os"
 
 	"net/http"
@@ -68,8 +70,13 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	autoHandler := auth.NewAuthHandler(authRepo, jwtManager)
 	auth.SetupAuthRoutes(r, autoHandler)
 
+	//Настройка уведомлений
+	notifRepo := notification.NewSqlNotificationRepo(db)
+	notifHandler := notification.NewNotificationHandler(notifRepo)
+	notification.SetupNotificationRoutes(r, notifHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
+
 	//Настройка админки
-	adminHandler := auth.NewAdminHandler(authRepo)
+	adminHandler := auth.NewAdminHandler(authRepo, notifRepo)
 	auth.SetupAdminRoutes(r, adminHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
 	//Настройка игр
@@ -77,7 +84,15 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	gameHandler := game.NewGameHandler(gameRepo)
 	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
-	moderationHandler := game.NewModerationHandler(gameRepo, authRepo)
+	chatRepo := chat.NewSqliteChatRepo(db)
+	chatHub := chat.NewHub()
+	chatHandler := chat.NewChatHandler(chatHub, chatRepo, []byte(cfg.EncryptKey))
+	chat.SetupChatRoutes(r, chatHandler, auth.AuthMiddleware(jwtManager))
+
+	//Запуск очистителя
+	game.StartCleaner(gameRepo)
+
+	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo)
 	game.SetupModerationRoutes(r, moderationHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
 	r.GET("/", func(c *gin.Context) {
