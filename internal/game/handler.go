@@ -13,16 +13,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"myapi/internal/files"
 )
 
 // Структура хэндлера
 type GameHandler struct {
-	Repo GameRepository
+	Repo     GameRepository
+	FileRepo files.FileRepository
 }
 
 // Конструктор для создания хэндлера
-func NewGameHandler(repo GameRepository) *GameHandler {
-	return &GameHandler{Repo: repo}
+func NewGameHandler(repo GameRepository, fileRepo files.FileRepository) *GameHandler {
+	return &GameHandler{Repo: repo, FileRepo: fileRepo}
 }
 
 // Проверка id перевода и игры
@@ -278,12 +281,9 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	//Получение форм с названием file
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка почучения файла"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка получения файла"})
 		return
 	}
-
-	//Подерживаемые формамы файлов
-	allowFileExts := map[string]bool{".zip": true, ".7zip": true, ".rar": true}
 
 	foundGame := h.Repo.CheckCreatedGame(gameid)
 
@@ -292,42 +292,24 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-	newFile := uuid.New().String() + ext
-
-	if !allowFileExts[ext] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Недопустимый формат файла!"})
+	if err := h.FileRepo.IsAllowedArchiveFormat(file); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	//Проверка на максимальный размер файла до 5 гб
-	if file.Size > 5<<30 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Файл слишком большой (макс 5 гб)"})
+	if err := h.FileRepo.IsAllowedArchiveSize(file.Size); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// uploads/files/"gameid"
-	folderPath := filepath.Join("uploads", "files", strconv.Itoa(gameid))
-
-	// Убедимся, что папка существует! Иначе SaveUploadedFile упадет с ошибкой
-	if err := os.MkdirAll(folderPath, os.ModePerm); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать директорию"})
-		return
-	}
-
-	//Создание полного пути для сохранения файла
-	savePathFile := filepath.Join(folderPath, newFile)
-
-	if err := c.SaveUploadedFile(file, savePathFile); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сохранить перевод"})
-		return
-	}
+	file_path, err := h.FileRepo.SaveArchive(gameid, file, c)
 
 	//Для url-скачивания: /static/files/"gameid"
-	file_url := filepath.Join("/static", "files", strconv.Itoa(gameid), newFile)
+	file_url := strings.Replace(file_path, "uploads", "static", 1)
 
 	//Для windows
-	file_url = strings.ReplaceAll(file_url, `\`, "/")
+	//file_url = strings.ReplaceAll(file_url, `\`, "/")
 
 	//Сначала узнаём размер файла в мегабайтах, а потом округляем до одного символа пары символов после точки
 	sizeInMb := float64(file.Size) / (1024 * 1024)
