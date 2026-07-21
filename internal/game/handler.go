@@ -4,10 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"net/http"
 
@@ -142,19 +139,21 @@ func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
 		return
 	}
 
-	if fileUrl != "" {
-		filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
+	// Внутри метода DownloadGameTranslation:
 
-		rawName := gameInfo.Title + "_" + author + filepath.Ext(fileUrl)
-		filename := strings.ReplaceAll(rawName, " ", "_")
-		filename = strings.ReplaceAll(filename, "+", "_")
+	if fileUrl != "" {
+		// Просим репозиторий дать нам путь к файлу
+		filePath, filename, err := h.FileRepo.GetArchivePath(gameInfo.Title, author, fileUrl)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 
 		fmt.Println("Попытка отдать файл:", filePath)
+		// Официант (Handler) сам отдает файл клиенту
 		c.FileAttachment(filePath, filename)
 		return
 	}
-
-	c.JSON(http.StatusInternalServerError, gin.H{"error": "URL файла пуст!"})
 }
 
 //POST /games/add
@@ -182,42 +181,34 @@ func (h *GameHandler) AddGame(c *gin.Context) {
 		return
 	}
 
-	//Подерживаемые формамы
-	allowExts := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
-
-	//Генерация уникального имени
-	ext := strings.ToLower(filepath.Ext(big_pic.Filename))
-	newPic := uuid.New().String() + ext
-
-	//Проверка на формат файлов
-	if !allowExts[ext] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Недопустимый формат файла!"})
+	//Проверка на поддерживаемые форматы
+	if err := h.FileRepo.IsAllowedImageFormat(big_pic); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	//Проверка на размер файлоы (максимум -> 5 мб)
-	if big_pic.Size > 5<<20 || small_pic.Size > 5<<20 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Файл слишком большой (макс 5 мб)"})
+	if err := h.FileRepo.IsAllowedImageFormat(small_pic); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	//Пути сохранения для картинок
-	savePathBig := filepath.Join("uploads/Icons/Big", newPic)
-	savePathSmall := filepath.Join("uploads/Icons/Small", newPic)
-
-	//Сохранение файлов на диск
-	if err := c.SaveUploadedFile(big_pic, savePathBig); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения большой иконки"})
+	//Проверка размера изображений
+	if err := h.FileRepo.IsAllowedImageSize(small_pic.Size, big_pic.Size); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := c.SaveUploadedFile(small_pic, savePathSmall); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения маленькой иконки"})
+	//Сохранения картинок
+	image_url, err := h.FileRepo.SaveImages(big_pic, small_pic)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	image_small_url := fmt.Sprintf("/static/Icons/Small/%s", newPic)
-	image_big_url := fmt.Sprintf("/static/Icons/Big/%s", newPic)
+	//Получение ссылки на маленькую иконку
+	image_small_url := image_url[0]
+	image_big_url := image_url[1]
 
 	//Создание id для игры
 	gameID := int(uuid.New().ID())
@@ -303,13 +294,13 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		return
 	}
 
-	file_path, err := h.FileRepo.SaveArchive(gameid, file, c)
-
 	//Для url-скачивания: /static/files/"gameid"
-	file_url := strings.Replace(file_path, "uploads", "static", 1)
+	file_url, err := h.FileRepo.SaveArchive(gameid, file)
 
-	//Для windows
-	//file_url = strings.ReplaceAll(file_url, `\`, "/")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	//Сначала узнаём размер файла в мегабайтах, а потом округляем до одного символа пары символов после точки
 	sizeInMb := float64(file.Size) / (1024 * 1024)
@@ -368,19 +359,11 @@ func (h *GameHandler) DeleteGame(c *gin.Context) {
 		return
 	}
 
-	//Удаление файлов с диска
-
-	//Удаление архвов
-	folderPath := filepath.Join("uploads", "files", strconv.Itoa(gameId))
-	_ = os.RemoveAll(folderPath) //Если будет ошибка, то можно заигнорить
+	_ = h.FileRepo.DeleteArchiveFile(gameId)
 
 	//Удаление иконок
 	if gameInfo.IconUrl != "" {
-		//Замена "/static/Icons" на "uploads/Icons"
-		filePathBig := strings.Replace(gameInfo.IconUrl, "/static/", "uploads/", 1)
-		filePathSmall := strings.Replace(filePathBig, "/Big/", "/Small/", 1)
-		_ = os.Remove(filePathBig)
-		_ = os.Remove(filePathSmall)
+		_ = h.FileRepo.DeleteImageFiles(gameInfo.IconUrl)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"error": "Игра вместе с переводами была удалена"})
@@ -397,7 +380,7 @@ func (h *GameHandler) DeleteTranslation(c *gin.Context) {
 		return
 	}
 
-	translationId, err := CheckGameId("transid")
+	translationId, err := CheckGameId(c.Param("transid"))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -434,8 +417,7 @@ func (h *GameHandler) DeleteTranslation(c *gin.Context) {
 
 	//Удаление файла из диска
 	if fileUrl != "" {
-		filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
-		_ = os.Remove(filePath)
+		_ = h.FileRepo.DeleteOneImageFile(fileUrl)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Перевод успешно удалён"})

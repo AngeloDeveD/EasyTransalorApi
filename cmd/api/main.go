@@ -7,6 +7,7 @@ import (
 	"myapi/internal/chat"
 	"myapi/internal/config"
 	"myapi/internal/database"
+	"myapi/internal/files"
 	"myapi/internal/game"
 	"myapi/internal/notification"
 	"os"
@@ -79,9 +80,11 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	adminHandler := auth.NewAdminHandler(authRepo, notifRepo)
 	auth.SetupAdminRoutes(r, adminHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
+	fileRepo := files.NewLocalFileRepo()
+
 	//Настройка игр
 	gameRepo := game.NewSqlGameRepo(db)
-	gameHandler := game.NewGameHandler(gameRepo)
+	gameHandler := game.NewGameHandler(gameRepo, fileRepo)
 	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
 	chatRepo := chat.NewSqliteChatRepo(db)
