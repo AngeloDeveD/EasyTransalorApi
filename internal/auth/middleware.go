@@ -55,3 +55,15 @@ func AdminMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func APIKeyMiddleware(validKey string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := c.GetHeader("X-Internal-Key")
+		if key == "" || key != validKey {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный сервисный ключ"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}

@@ -315,7 +315,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		PercentReady:  req.PercentReady,
 		UrlToDownload: file_url,
 		FileSize:      roundedSize,
-		Status:        "pending",
+		Status:        "pending_scan",
 	}
 
 	saveTranslationInfo := h.Repo.AddTranslation(gameid, trasnalteInfo)

@@ -17,6 +17,8 @@ type Config struct {
 
 	JWTSecret  string
 	EncryptKey string
+
+	InternalKey string
 }
 
 func Load() *Config {
@@ -63,6 +65,10 @@ func Load() *Config {
 	encryptKey := os.Getenv("EncryptKey")
 	if encryptKey == "" {
 		encryptKey = "12345678901234567890123456789012"
+	}
+	InternalKey := os.Getenv("InternalKey")
+	if InternalKey == "" {
+		InternalKey = `super_secret_cloud_key_998`
 	}
 
 	return &Config{

@@ -23,6 +23,7 @@ type GameRepository interface {
 	GetModerationQueue(limit int, offset int) ([]TranslateCard, int, error)
 	ApproveTranslation(translationId int) error
 	RejectTranslation(translationId int) error
+	UpdateScanResult(transID int, status string, details string) error
 }
 
 type SqliteGameRepo struct {
@@ -240,6 +241,18 @@ func (r *SqliteGameRepo) RejectTranslation(translationId int) error {
 	return result.Error
 }
 
+func (r *SqliteGameRepo) UpdateScanResult(transID int, status string, details string) error {
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", transID).Updates(map[string]interface{}{
+		"status":       status,
+		"scan_details": details,
+	})
+
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+	return result.Error
+}
+
 /*Для тестов*/
 
 func (r *InMemoryGameRepo) GetAllCards() ([]GameCard, error) {
@@ -350,3 +363,16 @@ func (r *InMemoryGameRepo) GetModerationQueue(limit int, offset int) ([]Translat
 
 func (r *InMemoryGameRepo) ApproveTranslation(translationId int) error { return nil }
 func (r *InMemoryGameRepo) RejectTranslation(translationId int) error  { return nil }
+
+func (r *InMemoryGameRepo) UpdateScanResult(transID int, status string, details string) error {
+	for i, game := range r.gameInfo {
+		for j, card := range game.TranslateCards {
+			if card.ID == transID {
+				r.gameInfo[i].TranslateCards[j].Status = status
+				r.gameInfo[i].TranslateCards[j].ScanDetails = details
+				return nil
+			}
+		}
+	}
+	return errors.New("перевод не найден")
+}

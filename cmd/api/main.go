@@ -95,6 +95,13 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	//Запуск очистителя
 	game.StartCleaner(gameRepo)
 
+	internalHandler := game.NewInternalHandler(gameRepo, authRepo, fileRepo, notifRepo)
+
+	internalGroup := r.Group("/api/internal", auth.APIKeyMiddleware(cfg.InternalKey))
+	{
+		internalGroup.POST("/scan-result", internalHandler.ReceiveScanResult)
+	}
+
 	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo)
 	game.SetupModerationRoutes(r, moderationHandler, auth.AuthMiddleware(jwtManager), auth.AdminMiddleware())
 
