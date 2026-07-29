@@ -9,7 +9,7 @@ MAIN_API_URL = "http://localhost:8080/api/internal/scan-result"
 INTERNAL_KEY = "super_secret_cloud_key_998"
 
 try:
-    cd = clamd.ClamdUnixSocket()
+    cd = clamd.ClamdNetworkSocket('localhost', 3310)
     cd.ping()
     print("ClamAV подключён")
 except Exception as e:
@@ -23,7 +23,31 @@ def scan_file():
     file_path = data.get('filePath')
 
     if not os.path.exists(file_path):
-        return send_result(trans_id, "rejected_by_scanner", "Файл не найден на диске", 200)
+        return send_result(trans_id, "rejected_by_scanner", "Файл не найден на диске"), 500
+    
+    if not cd:
+        #Если не работает ClamAV, то файл не пропускается
+        return send_result(trans_id, "rejected_by_scanner", "Антивирусник недоступен"), 500
+    
+    try:
+        #Сканирование файла
+        #ClamAV умеет заглядывать внутрь архивов
+        scan_result = cd.scan_file(file_path)
+
+        status, virus_name = list(scan_file.values())[0]
+
+        if status == "OK":
+            print(f"Файл {file_path} чист. ID: {trans_id}")
+            return send_result(trans_id, "pending", "clean"), 200
+        elif status == "FOUND":
+            msg = f"Обнаружен вирус: {virus_name}"
+            print(f"{msg}. ID: {trans_id}")
+            return send_result(trans_id, "rejected_by_scanner", msg), 200
+        else:
+            return send_result(trans_id, "rejected_by_scanner", "Ошибка сканирования"), 200
+    
+    except Exception as e:
+        return send_result(trans_id, "rejected_by_scanner", str(e)), 500
 
 
 

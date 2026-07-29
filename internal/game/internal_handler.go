@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -49,10 +50,19 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 	}
 
 	if req.Status == "rejected_by_scanner" {
+
+		//Проверка на статус самого http
+		if c.Writer.Status() != http.StatusAccepted {
+			err := fmt.Sprintf("Ошибка: %s", req.Details)
+
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+			return
+		}
+
 		// Достаем перевод, чтобы узнать автора и путь к файлу
 		translation, err := h.GameRepo.GetTranslationByID(req.TransID)
 		if err == nil {
-			// А) Отправляем уведомление
+			//Отправка уведомления
 			notif := &notification.Notification{
 				UserID:  translation.AuthorId,
 				Title:   "В архиве обнаружен вирус!",
