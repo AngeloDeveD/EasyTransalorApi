@@ -24,12 +24,12 @@ services:
     image: clamav/clamav:latest
     ports:
       - "3310:3310"
-    volumes:
-      # Кэшируем базы сигнатур, чтобы не качать ~200МБ при каждом рестарте
-      - clamav_db:/var/lib/clamav
-      # Кастомный конфиг: поднимает лимиты размеров до 4ГБ (иначе StreamMaxLength=10M
-      # роняет INSTREAM с Broken pipe на файлах крупнее 10МБ). read-only — образ его не переписывает.
-      - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+    # volumes:
+    #   # Кэшируем базы сигнатур, чтобы не качать ~200МБ при каждом рестарте
+    #   - clamav_db:/var/lib/clamav
+    #   # Кастомный конфиг: поднимает лимиты размеров до 4ГБ (иначе StreamMaxLength=10M
+    #   # роняет INSTREAM с Broken pipe на файлах крупнее 10МБ). read-only — образ его не переписывает.
+    #   - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
     healthcheck:
       # Скрипт из образа: пингует clamd, готов только после загрузки баз
       test: ["CMD", "/usr/local/bin/clamdcheck.sh"]

@@ -34,7 +34,8 @@ async def _report_to_go(trans_id: int, status: str, details: str) -> None:
     async with httpx.AsyncClient(timeout=30) as client:
         try:
             await client.post(settings.MAIN_API_URL, json=payload, headers=headers)
-            logger.info(f"Результат по transId {trans_id} отправлен в Go: {status}")
+            # ДОБАВЬ СЮДА details:
+            logger.info(f"Результат по transId {trans_id} отправлен в Go: {status} | {details}")
         except Exception as e:
             logger.error(f"Не удалось отправить результат в Go: {e}")
 
@@ -53,7 +54,7 @@ async def process_and_callback(task: ScanTask):
             scan_result = await run_pipeline(archive_path, archive_path.name)
 
             if scan_result.status == "clean":
-                result_status = "pending"
+                result_status = "approved"
                 result_details = "clean"
             elif scan_result.status == "sandbox_running":
                 # Файл ушёл в песочницу — запоминаем связь для callback'а

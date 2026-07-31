@@ -107,7 +107,7 @@ func (r *LocalFileRepo) SaveArchive(gameid int, file *multipart.FileHeader) (str
 	}
 
 	savePathFile = strings.ReplaceAll(savePathFile, `\`, "/")
-	file_url := strings.Replace(savePathFile, "uploads", "static", 1)
+	file_url := strings.Replace(savePathFile, "uploads", "/static", 1)
 
 	return file_url, nil
 }
@@ -149,8 +149,8 @@ func (r *LocalFileRepo) SaveImages(big_image *multipart.FileHeader, small_image 
 	savePathSmall = strings.ReplaceAll(savePathSmall, `\`, "/")
 	savePathBig = strings.ReplaceAll(savePathBig, `\`, "/")
 
-	image_small_url := strings.Replace(savePathSmall, "uploads", "static", 1)
-	image_big_url := strings.Replace(savePathBig, "uploads", "static", 1)
+	image_small_url := strings.Replace(savePathSmall, "uploads", "/static", 1)
+	image_big_url := strings.Replace(savePathBig, "uploads", "/static", 1)
 
 	return []string{image_small_url, image_big_url}, nil
 }
