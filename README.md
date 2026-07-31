@@ -13,9 +13,9 @@ go run ./cmd/api/
 
 ### Назначение администратора
 
-Остановить сервер и выполнить команду (заменить `nickname` на нужный):
+Остановить сервер и выполнить команду (заменить `userId` на нужный):
 ```bash
-go run ./cmd/api/ --make-admin nickname
+go run ./cmd/api/ --make-admin userId
 ```
 
 ### Запуск через Docker (PostgreSQL)
@@ -28,22 +28,11 @@ docker-compose up -d --build
 ```bash
 docker-compose down
 ```
-
-3. Просмотр статуса проверки файла:
+3. Просмотр логов проверки файлов:
 ```bash
 docker compose logs -f scanner
 ```
-
-### Переменные окружения
-
-* `APP_PORT` - порт (по умолчанию 8080)
-* `DB_TYPE` - `sqlite` или `postgres` (по умолчанию sqlite)
-* `DB_NAME` - имя БД (по умолчанию app.db)
-* `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS` - настройки для PostgreSQL
-* `JWT_SECRET` - секретный ключ для JWT
-
-### Тесты
-
+4. Назначение пользователя модератором(--make-moderator)/админом(--make-admin):
 ```bash
-go test ./... -v
+docker-compose exec api ./myapi --make-admin userId
 ```
