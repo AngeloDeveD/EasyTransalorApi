@@ -19,6 +19,13 @@ type Config struct {
 	EncryptKey string
 
 	InternalKey string
+
+	// Адрес python-сканера, куда Go шлёт POST /scan после загрузки архива
+	ScannerURL string
+
+	// Корень, по которому загрузки видны контейнеру-сканеру.
+	// В docker-compose это /app/uploads (общий том ./uploads примонтирован в оба контейнера).
+	ScannerFileRoot string
 }
 
 func Load() *Config {
@@ -66,20 +73,33 @@ func Load() *Config {
 	if encryptKey == "" {
 		encryptKey = "12345678901234567890123456789012"
 	}
-	InternalKey := os.Getenv("InternalKey")
-	if InternalKey == "" {
-		InternalKey = `super_secret_cloud_key_998`
+	internalKey := os.Getenv("InternalKey")
+	if internalKey == "" {
+		internalKey = `super_secret_cloud_key_998`
+	}
+
+	scannerURL := os.Getenv("SCANNER_URL")
+	if scannerURL == "" {
+		scannerURL = "http://localhost:8000/scan"
+	}
+
+	scannerFileRoot := os.Getenv("SCANNER_FILE_ROOT")
+	if scannerFileRoot == "" {
+		scannerFileRoot = "/app/uploads"
 	}
 
 	return &Config{
-		Port:       port,
-		DBType:     dbType,
-		DBName:     dbName,
-		DBHost:     dbHost,
-		DBPort:     dbPort,
-		DBUser:     dbUser,
-		DBPass:     dbPass,
-		JWTSecret:  jwtSecret,
-		EncryptKey: encryptKey,
+		Port:            port,
+		DBType:          dbType,
+		DBName:          dbName,
+		DBHost:          dbHost,
+		DBPort:          dbPort,
+		DBUser:          dbUser,
+		DBPass:          dbPass,
+		JWTSecret:       jwtSecret,
+		EncryptKey:      encryptKey,
+		InternalKey:     internalKey,
+		ScannerURL:      scannerURL,
+		ScannerFileRoot: scannerFileRoot,
 	}
 }

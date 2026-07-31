@@ -22,6 +22,11 @@ type WarnRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
 
+// Структура для смены роли пользователя
+type SetRoleRequest struct {
+	Role string `json:"role" binding:"required"`
+}
+
 //GET /api/admin/users?page=1&limit=20
 /*Получение списка пользователя*/
 func (h *AdminHandler) GetUsers(c *gin.Context) {
@@ -153,4 +158,37 @@ func (h *AdminHandler) UnwarnUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Последний варн снят"})
+}
+
+//PATCH /api/admin/users/:userid/role
+/*Меняет роль пользователя. Доступно ТОЛЬКО админу (маршрут закрыт AdminMiddleware),
+модераторы сюда не допускаются — назначение ролей остаётся эксклюзивом создателя.*/
+func (h *AdminHandler) SetRole(c *gin.Context) {
+	idStr := c.Param("userid")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID"})
+		return
+	}
+
+	var req SetRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите роль (author, moderator или admin)"})
+		return
+	}
+
+	if err := h.Repo.SetRole(id, req.Role); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	//Уведомление пользователя о смене роли
+	notif := &notification.Notification{
+		UserID:  id,
+		Title:   "Ваша роль изменена",
+		Message: "Администратор назначил вам роль: " + req.Role,
+	}
+	h.NotifRepo.Create(notif)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Роль пользователя обновлена"})
 }

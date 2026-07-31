@@ -48,7 +48,7 @@ func (h *ChatHandler) HandleChat(c *gin.Context) {
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		log.Printf("Ошибка апгрейда WS:", err)
+		log.Printf("Ошибка апгрейда WS: %v", err)
 		return
 	}
 

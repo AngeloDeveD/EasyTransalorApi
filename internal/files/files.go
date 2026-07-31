@@ -124,8 +124,19 @@ func (r *LocalFileRepo) SaveImages(big_image *multipart.FileHeader, small_image 
 	newPic_big := newPic + ext_big
 	newPic_small := newPic + ext_small
 
-	savePathBig := filepath.Join("uploads/Icons/Big", newPic_big)
-	savePathSmall := filepath.Join("uploads/Icons/Small", newPic_small)
+	bigDir := filepath.Join("uploads", "Icons", "Big")
+	smallDir := filepath.Join("uploads", "Icons", "Small")
+
+	// Создаём каталоги, если их ещё нет (как в SaveArchive) — иначе os.Create упадёт.
+	if err := os.MkdirAll(bigDir, os.ModePerm); err != nil {
+		return []string{}, errors.New("не удалось создать директорию для иконок")
+	}
+	if err := os.MkdirAll(smallDir, os.ModePerm); err != nil {
+		return []string{}, errors.New("не удалось создать директорию для иконок")
+	}
+
+	savePathBig := filepath.Join(bigDir, newPic_big)
+	savePathSmall := filepath.Join(smallDir, newPic_small)
 
 	if err := saveFile(big_image, savePathBig); err != nil {
 		return []string{}, errors.New("Ошибка сохранения большой иконки")

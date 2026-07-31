@@ -14,15 +14,23 @@ import (
 	"myapi/internal/files"
 )
 
+// ScanTrigger отправляет загруженный архив на антивирусную проверку.
+// Интерфейс держим в пакете game, чтобы не завязываться на пакет scanner
+// напрямую (и легко подменять заглушкой в тестах).
+type ScanTrigger interface {
+	Scan(transID int, fileURL string)
+}
+
 // Структура хэндлера
 type GameHandler struct {
 	Repo     GameRepository
 	FileRepo files.FileRepository
+	Scanner  ScanTrigger // может быть nil (напр. в тестах) — тогда проверка не запускается
 }
 
 // Конструктор для создания хэндлера
-func NewGameHandler(repo GameRepository, fileRepo files.FileRepository) *GameHandler {
-	return &GameHandler{Repo: repo, FileRepo: fileRepo}
+func NewGameHandler(repo GameRepository, fileRepo files.FileRepository, scanner ScanTrigger) *GameHandler {
+	return &GameHandler{Repo: repo, FileRepo: fileRepo, Scanner: scanner}
 }
 
 // Проверка id перевода и игры
@@ -323,6 +331,12 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	if saveTranslationInfo != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": saveTranslationInfo.Error()})
 		return
+	}
+
+	// Отправляем архив на антивирусную проверку в фоне.
+	// Пока статус остаётся "pending_scan"; вердикт придёт на /api/internal/scan-result.
+	if h.Scanner != nil {
+		h.Scanner.Scan(trasnalteInfo.ID, file_url)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{

@@ -1,3 +1,8 @@
-flask
+fastapi
+uvicorn[standard]
+pydantic
+httpx
 clamd
-requests
+yara-python
+rarfile
+py7zr

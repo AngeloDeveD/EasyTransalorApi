@@ -13,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+
+	"myapi/internal/files"
 )
 
 var heavyFileBytes = make([]byte, 5*1024*1024+1)
@@ -21,7 +23,9 @@ func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	repo := NewInMemoryGameRepo()
-	handler := NewGameHandler(repo)
+	// FileRepo — реальный локальный репозиторий (тесты сохраняют файлы);
+	// Scanner=nil — в тестах антивирусную проверку не запускаем.
+	handler := NewGameHandler(repo, files.NewLocalFileRepo(), nil)
 
 	// Заглушки для middleware
 	dummyAuthMiddleware := func(c *gin.Context) {
@@ -147,7 +151,7 @@ func TestAddGames_MultipleFiles_HeavyFiles(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Файл слишком большой (макс 5 мб)")
+	assert.Contains(t, w.Body.String(), "размер изображения большой")
 }
 
 // Добавление игры, но вместо картинок загружаются неизвестные файлы
@@ -178,7 +182,7 @@ func TestAddGames_MultipleFiles_UnsupportFormatFiles(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Недопустимый формат файла!")
+	assert.Contains(t, w.Body.String(), "неподдерживаемый формат изображения")
 }
 
 // Добавление перевода к игре
@@ -314,7 +318,7 @@ func TestAddTranslate_InvalidFileFormat(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Недопустимый формат файла!")
+	assert.Contains(t, w.Body.String(), "неподдерживаемый формат файла!")
 }
 
 // Получение игры по строковому ID (не числу)

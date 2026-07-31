@@ -29,6 +29,11 @@ docker-compose up -d --build
 docker-compose down
 ```
 
+3. Просмотр статуса проверки файла:
+```bash
+docker compose logs -f scanner
+```
+
 ### Переменные окружения
 
 * `APP_PORT` - порт (по умолчанию 8080)

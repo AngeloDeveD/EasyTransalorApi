@@ -18,3 +18,4 @@ vendor/
 # Локальные папки
 uploads/
 .git/
+__pycache__/

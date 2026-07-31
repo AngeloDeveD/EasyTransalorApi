@@ -364,6 +364,33 @@ func (r *InMemoryGameRepo) GetModerationQueue(limit int, offset int) ([]Translat
 func (r *InMemoryGameRepo) ApproveTranslation(translationId int) error { return nil }
 func (r *InMemoryGameRepo) RejectTranslation(translationId int) error  { return nil }
 
+// GetOldRejectedTranslations в тестах отдаёт все отклонённые переводы
+// (без учёта возраста — в памяти нет реальных дат создания).
+func (r *InMemoryGameRepo) GetOldRejectedTranslations(daysOld int) ([]TranslateCard, error) {
+	var cards []TranslateCard
+	for _, game := range r.gameInfo {
+		for _, card := range game.TranslateCards {
+			if card.Status == "rejected" {
+				cards = append(cards, card)
+			}
+		}
+	}
+	return cards, nil
+}
+
+// DeleteRejectedTranslation удаляет перевод по id из памяти.
+func (r *InMemoryGameRepo) DeleteRejectedTranslation(id int) error {
+	for i := range r.gameInfo {
+		for j, card := range r.gameInfo[i].TranslateCards {
+			if card.ID == id {
+				r.gameInfo[i].TranslateCards = append(r.gameInfo[i].TranslateCards[:j], r.gameInfo[i].TranslateCards[j+1:]...)
+				return nil
+			}
+		}
+	}
+	return errors.New("перевод не найден")
+}
+
 func (r *InMemoryGameRepo) UpdateScanResult(transID int, status string, details string) error {
 	for i, game := range r.gameInfo {
 		for j, card := range game.TranslateCards {

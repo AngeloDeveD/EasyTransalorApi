@@ -92,6 +92,17 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 				_ = os.Remove(filePath) // Удаляем файл, ошибку игнорируем (если файла уже нет)
 			}
 		}
+	} else if req.Status == "pending_sandbox" {
+		translation, err := h.GameRepo.GetTranslationByID(req.TransID)
+		if err == nil {
+			//Отправка уведомления
+			notif := &notification.Notification{
+				UserID:  translation.AuthorId,
+				Title:   "Файл был отправлен на глубокую проверку!",
+				Message: "Ваш перевод был отправлен на более глубокую проверку",
+			}
+			h.NotifRepo.Create(notif)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Результат сканирования принят"})
