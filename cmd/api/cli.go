@@ -32,5 +32,5 @@ func changeRole(cfg *config.Config, nickname string, role string) {
 	user.Role = role
 	db.Save(&user)
 
-	fmt.Println("Пользователь '%s' успешно назначен %s!\n", nickname, role)
+	fmt.Printf("Пользователь '%s' успешно назначен %s!\n", nickname, role)
 }
