@@ -136,12 +136,12 @@ func TestSaveArchive_RoundTrip(t *testing.T) {
 	url, err := repo.SaveArchive(7, fh)
 	require.NoError(t, err)
 
-	// file_url в формате static/files/{gameid}/{uuid}.zip (forward-slash, без ведущего /)
-	assert.True(t, strings.HasPrefix(url, "static/files/7/"), url)
+	// file_url в формате /static/files/{gameid}/{uuid}.zip (forward-slash)
+	assert.True(t, strings.HasPrefix(url, "/static/files/7/"), url)
 	assert.True(t, strings.HasSuffix(url, ".zip"), url)
 
 	// Файл реально лежит на диске по соответствующему uploads-пути
-	diskPath := filepath.FromSlash(strings.Replace(url, "static", "uploads", 1))
+	diskPath := filepath.FromSlash(strings.Replace(url, "/static/", "uploads/", 1))
 	_, err = os.Stat(diskPath)
 	assert.NoError(t, err)
 }

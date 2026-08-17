@@ -116,6 +116,19 @@ func (r *InMemoryUserRepo) UnwarnUser(id int) error {
 	return errors.New("нет варнов")
 }
 
+func (r *InMemoryUserRepo) SetRole(id int, role string) error {
+	if role != RoleAuthor && role != RoleModerator && role != RoleAdmin {
+		return errors.New("Недопустимая роль")
+	}
+	for i := range r.users {
+		if r.users[i].ID == id {
+			r.users[i].Role = role
+			return nil
+		}
+	}
+	return errors.New("не найден")
+}
+
 // Локальный мок для уведомлений (чтобы не тянуть БД в тесты).
 // Сигнатуры должны точно совпадать с notification.NotificationRepository.
 type mockNotifRepo struct{}
