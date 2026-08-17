@@ -19,18 +19,25 @@ type GameInfo struct {
 }
 
 type TranslateCard struct {
-	ID            int       `json:"id" gorm:"primaryKey;autoIncrement"`
-	AuthorName    string    `json:"authorName"`
-	AuthorId      int       `json:"authoreId"`
-	Source        string    `json:"source"`
-	Version       float64   `json:"version"`
-	PercentReady  float64   `json:"percentReady"`
-	UrlToDownload string    `json:"urlToDownload"`
-	FileSize      float64   `json:"fileSize"`
-	Status        string    `json:"status" gorm:"default:pending"` //pending, approved, rejected, error
-	ScanDetails   string    `json:"scanDetails" gorm:"default:''"`
-	GameInfoID    int       `json:"-"`
-	CreatedAt     time.Time `json:"createdAt"`
+	ID            int                 `json:"id" gorm:"primaryKey;autoIncrement"`
+	AuthorName    string              `json:"authorName"`
+	AuthorId      int                 `json:"authoreId"`
+	Source        string              `json:"source"`
+	Version       float64             `json:"version"`
+	PercentReady  float64             `json:"percentReady"`
+	UrlToDownload string              `json:"urlToDownload"`
+	FileSize      float64             `json:"fileSize"`
+	Status        string              `json:"status" gorm:"default:pending"` //pending, approved, rejected, error
+	ScanDetails   string              `json:"scanDetails" gorm:"default:''"`
+	GameFiles     []DetailedGameFiles `json:"gameFiles" gorm:"serializer:json"`
+	GameInfoID    int                 `json:"-"`
+	CreatedAt     time.Time           `json:"createdAt"`
+}
+
+type DetailedGameFiles struct {
+	FileName string `json:"fileName" binding:"required"`
+	Hash     string `json:"hash" binding:"required"`
+	Size     string `json:"size" binding:"required"`
 }
 
 type CreateGameRequest struct {

@@ -3,6 +3,7 @@ import sys
 import time
 import zipfile
 import json
+import unittest
 from typing import List, Dict, Any
 
 # Импортируем наш пайплайн и сканер ClamAV
@@ -10,12 +11,15 @@ try:
     from pipeline import ScanPipeline
     from av_scan import ClamAVScanner
     from config import Config
-except ImportError:
+except ImportError as exc:
     # Если запуск не из папки scanner
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from pipeline import ScanPipeline
-    from av_scan import ClamAVScanner
-    from config import Config
+    try:
+        from pipeline import ScanPipeline
+        from av_scan import ClamAVScanner
+        from config import Config
+    except ImportError as nested_exc:
+        raise unittest.SkipTest(f"scanner dependencies are not installed: {nested_exc}") from exc
 
 
 # Цвета для красивого вывода в терминал

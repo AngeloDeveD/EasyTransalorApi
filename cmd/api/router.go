@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "myapi/docs"
 	"myapi/internal/auth"
 	"myapi/internal/chat"
 	"myapi/internal/config"
@@ -12,6 +13,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func setupRouter(cfg *config.Config) *gin.Engine {
@@ -69,6 +72,12 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// Фоновые процессы
 	game.StartCleaner(gameRepo)
+
+	// Swagger UI
+	r.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Healthcheck
 	r.GET("/", func(c *gin.Context) {

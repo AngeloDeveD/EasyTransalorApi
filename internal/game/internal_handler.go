@@ -1,7 +1,6 @@
 package game
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -31,9 +30,22 @@ func NewInternalHandler(gameRepo GameRepository, userRepo auth.UserRepository, f
 }
 
 type ScanResultRequest struct {
-	TransID int    `json:"transId" binding:"required"`
-	Status  string `json:"status" binding:"required"`
-	Details string `json:"details"`
+	TransID int                 `json:"transId" binding:"required"`
+	Status  string              `json:"status" binding:"required"`
+	Details string              `json:"details"`
+	Threats []string            `json:"threats"`
+	Error   string              `json:"error"`
+	Files   []DetailedGameFiles `json:"files"`
+}
+
+func (r ScanResultRequest) scanDetails() string {
+	if r.Details != "" {
+		return r.Details
+	}
+	if len(r.Threats) > 0 {
+		return strings.Join(r.Threats, "; ")
+	}
+	return r.Error
 }
 
 // POST /api/internal/scan-result
@@ -44,18 +56,12 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 		return
 	}
 
-	if err := h.GameRepo.UpdateScanResult(req.TransID, req.Status, req.Details); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	details := req.scanDetails()
 
 	switch req.Status {
 	case "rejected":
-		//Проверка на статус самого http
-		if c.Writer.Status() != http.StatusAccepted {
-			err := fmt.Sprintf("Ошибка: %s", req.Details)
-
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		if err := h.GameRepo.UpdateScanResult(req.TransID, req.Status, details); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -66,12 +72,12 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 			notif := &notification.Notification{
 				UserID:  translation.AuthorId,
 				Title:   "В архиве обнаружен вирус!",
-				Message: "Ваш перевод отклонен антивирусной проверкой. Детали: " + req.Details,
+				Message: "Ваш перевод отклонен антивирусной проверкой. Детали: " + details,
 			}
 			h.NotifRepo.Create(notif)
 
 			// Автоматическа выдача варн пользователю
-			_ = h.UserRepo.WarnUser(translation.AuthorId, "Загрузка файла с вирусом: "+req.Details)
+			_ = h.UserRepo.WarnUser(translation.AuthorId, "Загрузка файла с вирусом: "+details)
 
 			//Проверка, не превысил ли лимит (3 варна = бан)
 			user, err := h.UserRepo.GetUserById(translation.AuthorId)
@@ -93,6 +99,11 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 			}
 		}
 	case "error":
+		if err := h.GameRepo.UpdateScanResult(req.TransID, req.Status, details); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
 		translation, err := h.GameRepo.GetTranslationByID(req.TransID)
 		if err == nil {
 			//Отправка уведомления
@@ -102,6 +113,25 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 				Message: "Ваш перевод был отправлен на более глубокую проверку",
 			}
 			h.NotifRepo.Create(notif)
+		}
+	case "approved":
+		translation, err := h.GameRepo.GetTranslationByID(req.TransID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if err := h.GameRepo.UpdateFileInfo(translation.ID, req.Files); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if err := h.GameRepo.UpdateScanResult(req.TransID, req.Status, details); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	default:
+		if err := h.GameRepo.UpdateScanResult(req.TransID, req.Status, details); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
 		}
 	}
 

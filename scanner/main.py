@@ -32,6 +32,8 @@ async def process_scan_and_notify(trans_id: int, file_path: str):
             "status": "error",
             "isSafe": False,
             "threats": [f"File not found on scanner disk: {file_path}"],
+            "details": f"File not found on scanner disk: {file_path}",
+            "files": [],
             "error": "Файл не найден"
         }
     else:
@@ -43,6 +45,8 @@ async def process_scan_and_notify(trans_id: int, file_path: str):
                 "status": verdict.get("status", "error"),
                 "isSafe": verdict.get("is_safe", False),
                 "threats": verdict.get("threats", []),
+                "details": "; ".join(verdict.get("threats", [])) or verdict.get("error") or "",
+                "files": verdict.get("files", []),
                 "error": verdict.get("error")
             }
         except Exception as e:
@@ -52,6 +56,8 @@ async def process_scan_and_notify(trans_id: int, file_path: str):
                 "status": "error",
                 "isSafe": False,
                 "threats": [],
+                "details": str(e),
+                "files": [],
                 "error": str(e)
             }
 

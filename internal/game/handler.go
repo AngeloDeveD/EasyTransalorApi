@@ -33,6 +33,23 @@ func NewGameHandler(repo GameRepository, fileRepo files.FileRepository, scanner 
 	return &GameHandler{Repo: repo, FileRepo: fileRepo, Scanner: scanner}
 }
 
+func normalizeGameFiles(games []GameInfo) {
+	for i := range games {
+		normalizeGameFile(&games[i])
+	}
+}
+
+func normalizeGameFile(game *GameInfo) {
+	if game.TranslateCards == nil {
+		game.TranslateCards = []TranslateCard{}
+	}
+	for i := range game.TranslateCards {
+		if game.TranslateCards[i].GameFiles == nil {
+			game.TranslateCards[i].GameFiles = []DetailedGameFiles{}
+		}
+	}
+}
+
 // Проверка id перевода и игры
 // Проверяет на отсутвие символов и на то, чтобы в id были только числа
 func CheckGameIdForNumValue(gameId string) (int, error) {
@@ -69,6 +86,7 @@ func (h *GameHandler) GetGames(c *gin.Context) {
 		return
 	}
 
+	normalizeGameFiles(games)
 	c.JSON(http.StatusAccepted, games)
 }
 
@@ -90,6 +108,7 @@ func (h *GameHandler) GetGameById(c *gin.Context) {
 		return
 	}
 
+	normalizeGameFile(&game)
 	c.JSON(http.StatusAccepted, game)
 }
 
@@ -115,7 +134,7 @@ func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
 
 	if card.Status != "approved" {
 		role, exist := c.Get("role")
-		if !exist || role != "moderation" || role != "admin" {
+		if !exist || role != "moderation" && role != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ закрыт. Файл находится на модерации."})
 			return
 		}
@@ -305,6 +324,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		UrlToDownload: file_url,
 		FileSize:      roundedSize,
 		Status:        "pending_scan",
+		GameFiles:     []DetailedGameFiles{},
 	}
 
 	saveTranslationInfo := h.Repo.AddTranslation(gameid, trasnalteInfo)
