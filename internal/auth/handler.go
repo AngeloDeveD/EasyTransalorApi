@@ -30,11 +30,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user := &User{
-		FirstName:    req.FirstName,
-		SecondName:   req.LastName,
-		Nickname:     req.Nickname,
-		PasswordHash: string(hashedPassword),
-		Role:         "author",
+		FirstName:      req.FirstName,
+		SecondName:     req.LastName,
+		Nickname:       req.Nickname,
+		PasswordHash:   string(hashedPassword),
+		Role:           "author",
+		RegistrationIP: c.ClientIP(),
+		LastLoginIP:    c.ClientIP(),
 	}
 
 	if err := h.Repo.CreateUser(user); err != nil {
@@ -66,6 +68,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный никнейм или пароль"})
 		return
 	}
+
+	_ = h.Repo.UpdateLastLoginInfo(user.ID, c.ClientIP())
 
 	token, err := h.Jwt.GenerateToken(user.ID, user.Role)
 	if err != nil {

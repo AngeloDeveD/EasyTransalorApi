@@ -12,6 +12,7 @@ type UserRepository interface {
 	GetUserByNickname(nickname string) (*User, error)
 	GetUserById(id int) (*User, error)
 	GetUsers(limit int, offset int) ([]User, int64, error)
+	UpdateLastLoginInfo(id int, ip string) error
 	BlockUser(id int) error
 	UnblockUser(id int) error
 	WarnUser(id int, reason string) error
@@ -57,6 +58,14 @@ func (r *SqlUserRepo) GetUserByNickname(nickname string) (*User, error) {
 	}
 
 	return &user, nil
+}
+
+func (r *SqlUserRepo) UpdateLastLoginInfo(id int, ip string) error {
+	now := time.Now()
+	return r.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"last_login_ip": ip,
+		"last_login_at": now,
+	}).Error
 }
 
 func (r *SqlUserRepo) BlockUser(id int) error {

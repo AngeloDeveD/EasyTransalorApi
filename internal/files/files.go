@@ -1,6 +1,8 @@
 package files
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -90,6 +92,26 @@ func saveFile(file *multipart.FileHeader, savePath string) error {
 	return nil
 }
 
+func StaticURLToPath(fileURL string) string {
+	fileURL = strings.ReplaceAll(fileURL, `\`, "/")
+	return filepath.FromSlash(strings.Replace(fileURL, "/static/", "uploads/", 1))
+}
+
+func CalculateSHA256(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
 func (r *LocalFileRepo) SaveArchive(gameid int, file *multipart.FileHeader) (string, error) {
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	newFile := uuid.New().String() + ext
@@ -165,10 +187,7 @@ func (r *LocalFileRepo) DeleteGameFiles(gameId int) error {
 }
 
 func (r *LocalFileRepo) DeleteFile(fileUrl string) error {
-
-	fileUrl = strings.ReplaceAll(fileUrl, `\`, "/")
-
-	filePath := strings.Replace(fileUrl, "static", "uploads", 1)
+	filePath := StaticURLToPath(fileUrl)
 	if err := os.Remove(filePath); err != nil {
 		return errors.New("Ошибка удаления файла")
 	}
@@ -177,8 +196,8 @@ func (r *LocalFileRepo) DeleteFile(fileUrl string) error {
 }
 
 func (r *LocalFileRepo) DeleteImageFiles(big_img_url string) error {
-	filePathBig := strings.Replace(big_img_url, "/static/", "uploads/", 1)
-	filePathSmall := strings.Replace(filePathBig, "/Big/", "/Small/", 1)
+	filePathBig := StaticURLToPath(big_img_url)
+	filePathSmall := strings.Replace(filePathBig, string(filepath.Separator)+"Big"+string(filepath.Separator), string(filepath.Separator)+"Small"+string(filepath.Separator), 1)
 
 	if err := os.Remove(filePathBig); err != nil {
 		return errors.New("ошибка удаления большого изображения")
@@ -197,7 +216,7 @@ func (r *LocalFileRepo) GetArchivePath(titleFile string, author string, fileUrl 
 	}
 
 	// 1. Превращаем URL в реальный путь на диске
-	filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
+	filePath := StaticURLToPath(fileUrl)
 
 	// 2. Формируем красивое имя для скачивания
 	rawName := titleFile + "_" + author + filepath.Ext(fileUrl)

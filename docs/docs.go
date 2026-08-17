@@ -41,6 +41,7 @@ const docTemplate = `{
         "responses": { "200": { "description": "JWT token" }, "401": { "description": "Unauthorized" } }
       }
     },
+    "/health": { "get": { "summary": "Health check", "tags": ["System"], "responses": { "200": { "description": "OK" } } } },
     "/api/auth/me": {
       "get": {
         "summary": "Get current user",
@@ -62,7 +63,7 @@ const docTemplate = `{
         "summary": "List games with translations",
         "tags": ["Games"],
         "produces": ["application/json"],
-        "responses": { "202": { "description": "Games", "schema": { "type": "array", "items": { "$ref": "#/definitions/GameInfo" } } } }
+        "responses": { "202": { "description": "Games", "schema": { "type": "array", "items": { "$ref": "#/definitions/PublicGameInfo" } } } }
       }
     },
     "/games/{gameid}": {
@@ -71,7 +72,7 @@ const docTemplate = `{
         "tags": ["Games"],
         "produces": ["application/json"],
         "parameters": [{ "name": "gameid", "in": "path", "required": true, "type": "integer" }],
-        "responses": { "202": { "description": "Game", "schema": { "$ref": "#/definitions/GameInfo" } }, "400": { "description": "Bad request" } }
+        "responses": { "202": { "description": "Game", "schema": { "$ref": "#/definitions/PublicGameInfo" } }, "400": { "description": "Bad request" } }
       },
       "delete": {
         "summary": "Delete game",
@@ -132,6 +133,11 @@ const docTemplate = `{
         "responses": { "200": { "description": "File" }, "403": { "description": "Forbidden" }, "404": { "description": "Not found" } }
       }
     },
+    "/api/files/hash-check": { "post": { "summary": "Check archive SHA-256 duplicate", "tags": ["Translations"], "security": [{ "BearerAuth": [] }], "parameters": [{ "in": "body", "name": "body", "required": true, "schema": { "$ref": "#/definitions/ArchiveHashCheckRequest" } }], "responses": { "200": { "description": "Exists flag" }, "400": { "description": "Bad request" } } } },
+    "/api/me/translations": { "get": { "summary": "List current user translations", "tags": ["Translations"], "security": [{ "BearerAuth": [] }], "responses": { "200": { "description": "Translations", "schema": { "type": "array", "items": { "$ref": "#/definitions/MyTranslation" } } } } } },
+    "/translations/{transid}/status": { "get": { "summary": "Get translation scan status", "tags": ["Translations"], "security": [{ "BearerAuth": [] }], "parameters": [{ "name": "transid", "in": "path", "required": true, "type": "integer" }], "responses": { "200": { "description": "Status", "schema": { "$ref": "#/definitions/TranslationStatus" } }, "403": { "description": "Forbidden" }, "404": { "description": "Not found" } } } },
+    "/translations/{transid}/files": { "get": { "summary": "List approved translation files", "tags": ["Translations"], "parameters": [{ "name": "transid", "in": "path", "required": true, "type": "integer" }], "responses": { "200": { "description": "Files", "schema": { "type": "array", "items": { "$ref": "#/definitions/PublicGameFile" } } }, "403": { "description": "Forbidden" }, "404": { "description": "Not found" } } } },
+    "/translations/{transid}": { "delete": { "summary": "Delete own pending/rejected translation", "tags": ["Translations"], "security": [{ "BearerAuth": [] }], "parameters": [{ "name": "transid", "in": "path", "required": true, "type": "integer" }], "responses": { "200": { "description": "Deleted" }, "403": { "description": "Forbidden" }, "404": { "description": "Not found" } } } },
     "/api/admin/users": {
       "get": {
         "summary": "List users",
@@ -169,6 +175,12 @@ const docTemplate = `{
     "ReasonRequest": { "type": "object", "properties": { "reason": { "type": "string" } } },
     "RoleRequest": { "type": "object", "properties": { "role": { "type": "string", "example": "moderation" } } },
     "NotificationRequest": { "type": "object", "properties": { "title": { "type": "string" }, "message": { "type": "string" }, "isGlobal": { "type": "boolean" }, "userId": { "type": "integer" } } },
+    "ArchiveHashCheckRequest": { "type": "object", "properties": { "archiveHash": { "type": "string" } } },
+    "PublicGameInfo": { "type": "object", "properties": { "id": { "type": "integer" }, "title": { "type": "string" }, "iconUrl": { "type": "string" }, "translations": { "type": "array", "items": { "$ref": "#/definitions/PublicTranslationSummary" } } } },
+    "PublicTranslationSummary": { "type": "object", "properties": { "id": { "type": "integer" }, "authorName": { "type": "string" }, "source": { "type": "string" }, "version": { "type": "number" }, "percentReady": { "type": "number" }, "fileSize": { "type": "number" }, "createdAt": { "type": "string", "format": "date-time" }, "downloadUrl": { "type": "string" } } },
+    "PublicGameFile": { "type": "object", "properties": { "fileName": { "type": "string" }, "size": { "type": "string" } } },
+    "TranslationStatus": { "type": "object", "properties": { "id": { "type": "integer" }, "status": { "type": "string" }, "scanDetails": { "type": "string" }, "files": { "type": "array", "items": { "$ref": "#/definitions/PublicGameFile" } } } },
+    "MyTranslation": { "type": "object", "properties": { "id": { "type": "integer" }, "gameInfoId": { "type": "integer" }, "authorName": { "type": "string" }, "source": { "type": "string" }, "version": { "type": "number" }, "percentReady": { "type": "number" }, "fileSize": { "type": "number" }, "status": { "type": "string" }, "scanDetails": { "type": "string" }, "createdAt": { "type": "string", "format": "date-time" }, "downloadUrl": { "type": "string" } } },
     "GameCard": { "type": "object", "properties": { "id": { "type": "integer" }, "title": { "type": "string" }, "iconUrl": { "type": "string" }, "gameId": { "type": "integer" } } },
     "GameInfo": { "type": "object", "properties": { "id": { "type": "integer" }, "title": { "type": "string" }, "iconUrl": { "type": "string" }, "translateCards": { "type": "array", "items": { "$ref": "#/definitions/TranslateCard" } } } },
     "TranslateCard": { "type": "object", "properties": { "id": { "type": "integer" }, "authorName": { "type": "string" }, "authoreId": { "type": "integer" }, "source": { "type": "string" }, "version": { "type": "number" }, "percentReady": { "type": "number" }, "urlToDownload": { "type": "string" }, "fileSize": { "type": "number" }, "status": { "type": "string" }, "scanDetails": { "type": "string" }, "gameFiles": { "type": "array", "items": { "$ref": "#/definitions/DetailedGameFile" } }, "createdAt": { "type": "string", "format": "date-time" } } },

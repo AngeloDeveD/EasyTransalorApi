@@ -12,6 +12,7 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.H
 		public.GET("/games", handler.GetGames)
 		public.GET("/games/:gameid", handler.GetGameById)
 		public.GET("/download/:transid", handler.DownloadGameTranslation)
+		public.GET("/translations/:transid/files", handler.GetTranslationFiles)
 	}
 
 	privateMiddlewares := append([]gin.HandlerFunc{authHandler}, writeMiddlewares...)
@@ -19,6 +20,10 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.H
 	{
 		private.POST("/games/add", handler.AddGame)
 		private.POST("games/translate/:gameid", handler.AddTranslationInfo)
+		private.POST("/api/files/hash-check", handler.HashCheckArchive)
+		private.GET("/translations/:transid/status", handler.GetTranslationStatus)
+		private.GET("/api/me/translations", handler.GetMyTranslations)
+		private.DELETE("/translations/:transid", handler.DeleteMyTranslation)
 	}
 
 	adminMiddlewares := append([]gin.HandlerFunc{authHandler, adminHandler}, writeMiddlewares...)

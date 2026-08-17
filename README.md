@@ -156,13 +156,14 @@ POSTGRES_DB=translations_db
 # Безопасность и авторизация
 JWT_SECRET=super_duper_secret_prod_key_998
 INTERNAL_KEY=super_secret_cloud_key_998
+ENCRYPT_KEY=12345678901234567890123456789012
 
 # Конфигурация ClamAV
 CLAMD_HOST=clamav
 CLAMD_PORT=3310
 
 # Настройки Webhook
-MAIN_API_URL=http://api:8080/api/internal/scan-result
+API_WEBHOOK_URL=http://api:8080/api/internal/scan-result
 ```
 ---
 
