@@ -11,6 +11,7 @@ func SetupAdminRoutes(r *gin.Engine, h *AdminHandler, authMiddleware gin.Handler
 	modGroup := r.Group("/api/admin", authMiddleware, moderatorMiddleware)
 	{
 		modGroup.GET("/users", h.GetUsers)
+		modGroup.GET("/audit", h.GetAuditEvents)
 		modGroup.PATCH("/users/:userid/block", h.BlockUser)
 		modGroup.PATCH("/users/:userid/unblock", h.UnblockUser)
 		modGroup.PATCH("/users/:userid/warn", h.WarnUser)

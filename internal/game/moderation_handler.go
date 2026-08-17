@@ -1,9 +1,11 @@
 package game
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
+	"myapi/internal/audit"
 	"myapi/internal/auth"
 	"myapi/internal/notification"
 
@@ -14,10 +16,21 @@ type ModerationHandler struct {
 	GameRepo  GameRepository
 	UserRepo  auth.UserRepository
 	NotifRepo notification.NotificationRepository
+	AuditRepo audit.Repository
 }
 
-func NewModerationHandler(gameRepo GameRepository, userRepo auth.UserRepository, notifRepo notification.NotificationRepository) *ModerationHandler {
-	return &ModerationHandler{GameRepo: gameRepo, UserRepo: userRepo, NotifRepo: notifRepo}
+func NewModerationHandler(gameRepo GameRepository, userRepo auth.UserRepository, notifRepo notification.NotificationRepository, auditRepos ...audit.Repository) *ModerationHandler {
+	auditRepo := audit.Repository(audit.NoopRepository{})
+	if len(auditRepos) > 0 && auditRepos[0] != nil {
+		auditRepo = auditRepos[0]
+	}
+	return &ModerationHandler{GameRepo: gameRepo, UserRepo: userRepo, NotifRepo: notifRepo, AuditRepo: auditRepo}
+}
+
+func (h *ModerationHandler) recordAudit(c *gin.Context, action string, targetID int, details string) {
+	if err := h.AuditRepo.Create(audit.NewEventFromContext(c, action, audit.TargetTranslation, targetID, details)); err != nil {
+		slog.ErrorContext(c.Request.Context(), "audit log failed", slog.String("action", action), slog.Int("target_id", targetID), slog.Any("error", err))
+	}
 }
 
 // GET /api/admin/moderation?page=1
@@ -68,6 +81,7 @@ func (h *ModerationHandler) ChangeStatus(c *gin.Context) {
 		return
 	}
 
+	h.recordAudit(c, "translation.change_status", transId, status)
 	c.JSON(http.StatusOK, gin.H{"message": "Статус перевода изменён"})
 }
 
@@ -85,6 +99,7 @@ func (h *ModerationHandler) Approve(c *gin.Context) {
 		return
 	}
 
+	h.recordAudit(c, "translation.approve", transId, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Перевод одобрен и опубликован"})
 }
 
@@ -123,5 +138,6 @@ func (h *ModerationHandler) Reject(c *gin.Context) {
 		Message: "Ваш перевод (ID: " + transIdStr + ") был отклонён. Причина: " + req.Reason,
 	}
 	h.NotifRepo.Create(notif)
+	h.recordAudit(c, "translation.reject", transId, req.Reason)
 	c.JSON(http.StatusOK, gin.H{"message": "Перевод отклонён. Автору отправлено уведомление."})
 }
