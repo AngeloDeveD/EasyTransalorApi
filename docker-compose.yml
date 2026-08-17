@@ -78,6 +78,14 @@ services:
       # Внутренний секрет и адрес сканера (имя сервиса scanner в этой же сети)
       - INTERNAL_KEY=super_secret_cloud_key_998
       - SCANNER_URL=http://scanner:8000/scan
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_GLOBAL_REQUESTS=120
+      - RATE_LIMIT_GLOBAL_WINDOW=1m
+      - RATE_LIMIT_AUTH_REQUESTS=10
+      - RATE_LIMIT_AUTH_WINDOW=1m
+      - RATE_LIMIT_WRITE_REQUESTS=1
+      - RATE_LIMIT_WRITE_WINDOW=10s
     volumes:
       # Сохраняем загруженные файлы на твоем компе, чтобы они не пропали при остановке контейнера
       - ./uploads:/app/uploads

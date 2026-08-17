@@ -9,6 +9,7 @@ import (
 	"myapi/internal/files"
 	"myapi/internal/game"
 	"myapi/internal/notification"
+	"myapi/internal/ratelimit"
 	"myapi/internal/scanner"
 	"net/http"
 
@@ -19,6 +20,14 @@ import (
 
 func setupRouter(cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
+
+	limiter := ratelimit.NewMemoryLimiter()
+	r.Use(limiter.Middleware(ratelimit.Config{
+		Enabled:  cfg.RateLimitEnabled,
+		Requests: cfg.RateLimitGlobalRequests,
+		Window:   cfg.RateLimitGlobalWindow,
+	}, ratelimit.KeyByClientIP("global")))
 
 	db, err := database.ConnectDB(cfg)
 	if err != nil {
@@ -40,7 +49,11 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// Авторизация
 	autoHandler := auth.NewAuthHandler(authRepo, jwtManager)
-	auth.SetupAuthRoutes(r, autoHandler)
+	auth.SetupAuthRoutes(r, autoHandler, limiter.Middleware(ratelimit.Config{
+		Enabled:  cfg.RateLimitEnabled,
+		Requests: cfg.RateLimitAuthRequests,
+		Window:   cfg.RateLimitAuthWindow,
+	}, ratelimit.KeyByClientIP("auth")))
 
 	// Уведомления
 	notifHandler := notification.NewNotificationHandler(notifRepo)
@@ -52,7 +65,11 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// Игры
 	gameHandler := game.NewGameHandler(gameRepo, fileRepo, scannerClient)
-	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware())
+	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware(), limiter.Middleware(ratelimit.Config{
+		Enabled:  cfg.RateLimitEnabled,
+		Requests: cfg.RateLimitWriteRequests,
+		Window:   cfg.RateLimitWriteWindow,
+	}, ratelimit.KeyByUserOrIP("game-write")))
 
 	// Чат
 	chatHub := chat.NewHub()

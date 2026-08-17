@@ -164,3 +164,22 @@ CLAMD_PORT=3310
 # Настройки Webhook
 MAIN_API_URL=http://api:8080/api/internal/scan-result
 ```
+---
+
+## Rate Limiting
+
+API ограничивает частоту запросов in-memory внутри Go-приложения:
+
+```ini
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_GLOBAL_REQUESTS=120
+RATE_LIMIT_GLOBAL_WINDOW=1m
+RATE_LIMIT_AUTH_REQUESTS=10
+RATE_LIMIT_AUTH_WINDOW=1m
+RATE_LIMIT_WRITE_REQUESTS=1
+RATE_LIMIT_WRITE_WINDOW=10s
+```
+
+* `GLOBAL` - общий лимит на IP для всего API.
+* `AUTH` - отдельный лимит на `/api/auth/login` и `/api/auth/register`, чтобы снижать риск брутфорса.
+* `WRITE` - cooldown на повторные write-запросы одного пользователя к одному route.
