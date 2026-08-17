@@ -5,30 +5,47 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
 type ChatHandler struct {
-	Hub       *Hub
-	Repo      ChatRepository
-	CryptoKey []byte //Ключ для шифрования
+	Hub            *Hub
+	Repo           ChatRepository
+	CryptoKey      []byte //Ключ для шифрования
+	AllowedOrigins map[string]struct{}
 }
 
-func NewChatHandler(hub *Hub, repo ChatRepository, cryptoKey []byte) *ChatHandler {
-	return &ChatHandler{Hub: hub, Repo: repo, CryptoKey: cryptoKey}
+func NewChatHandler(hub *Hub, repo ChatRepository, cryptoKey []byte, allowedOrigins ...[]string) *ChatHandler {
+	allowed := map[string]struct{}{}
+	if len(allowedOrigins) > 0 {
+		for _, origin := range allowedOrigins[0] {
+			origin = strings.TrimSpace(origin)
+			if origin != "" {
+				allowed[origin] = struct{}{}
+			}
+		}
+	}
+	return &ChatHandler{Hub: hub, Repo: repo, CryptoKey: cryptoKey, AllowedOrigins: allowed}
 }
 
-// Переводчик из http в WS
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+func (h *ChatHandler) websocketUpgrader() websocket.Upgrader {
+	return websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+			_, ok := h.AllowedOrigins[origin]
+			return ok
+		},
+	}
 }
 
 // Структура сообщения, которые ожидается от клиента по ws
-// Пример json: {"to": 1, "text": "Привет, говноед!"}
+// Пример json: {"to": 1, "text": "Привет"}
 type IncomingMessage struct {
 	To   int    `json:"to"`   //Кому отправка (userID)
 	Text string `json:"text"` //Текст сообщения
@@ -44,8 +61,7 @@ func (h *ChatHandler) HandleChat(c *gin.Context) {
 	}
 	myID := userID.(int)
 
-	//Переделка соединения в WebSocket
-
+	upgrader := h.websocketUpgrader()
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Ошибка апгрейда WS: %v", err)

@@ -18,27 +18,32 @@ const (
 )
 
 func AuthMiddleware(jwt *JWTManager) gin.HandlerFunc {
+	return authMiddleware(jwt, nil)
+}
+
+func AuthMiddlewareWithUserCheck(jwt *JWTManager, repo UserRepository) gin.HandlerFunc {
+	return authMiddleware(jwt, repo)
+}
+
+func authMiddleware(jwt *JWTManager, repo UserRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := ""
 
-		//Попытка взять токен из заголовка
 		authHeader := c.GetHeader("Authorization")
-		if len(strings.Split(authHeader, " ")) == 2 {
-			tokenString = strings.Split(authHeader, " ")[1]
-		} else {
-			//Если в заголовке НЕТ токена, поиск его в URL (?token=...)
-			//Это нужно для WebSocket, так как браузеры не могут отправить заголовок при WS-подключении
+		parts := strings.Fields(authHeader)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			tokenString = parts[1]
+		} else if c.FullPath() == "/api/chat/ws" || c.Request.URL.Path == "/api/chat/ws" {
+			// Query token оставлен только для WebSocket, где браузер не может удобно отправить Authorization header.
 			tokenString = c.Query("token")
 		}
 
-		//Если токена вообще нигде нет - отфутболивание
 		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			c.Abort()
 			return
 		}
 
-		// Проверка токена
 		claims, err := jwt.ParseToken(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Невалидный или истекший токен"})
@@ -46,7 +51,21 @@ func AuthMiddleware(jwt *JWTManager) gin.HandlerFunc {
 			return
 		}
 
-		// Добавление данных юзера в контекст
+		if repo != nil {
+			user, err := repo.GetUserById(claims.UserID)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь не найден"})
+				c.Abort()
+				return
+			}
+			if user.IsBlocked {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Аккаунт заблокирован"})
+				c.Abort()
+				return
+			}
+			claims.Role = user.Role
+		}
+
 		c.Set("userID", claims.UserID)
 		c.Set("role", claims.Role)
 

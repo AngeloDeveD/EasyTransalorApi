@@ -67,6 +67,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	if user.IsBlocked {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Аккаунт заблокирован"})
+		return
+	}
+
+	_ = h.Repo.UpdateLastLoginInfo(user.ID, c.ClientIP())
+
 	token, err := h.Jwt.GenerateToken(user.ID, user.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка при создании токена"})

@@ -3,16 +3,19 @@ package auth
 import "time"
 
 type User struct {
-	ID           int       `json:"id" gorm:"primaryKey;autoIncrement"`
-	FirstName    string    `json:"firstName" gorm:"not null"`
-	SecondName   string    `json:"secondName" gorm:"not null"`
-	Nickname     string    `json:"nickname" gorm:"uniqueIndex;not null"` //Уникальный никнейм
-	PasswordHash string    `json:"-" gorm:"not null"`
-	Role         string    `json:"role" gorm:"default:author"` //Роль: либо автор либо админ
-	CreatedAt    time.Time `json:"createdAt"`
-	IsBlocked    bool      `json:"isBlocked" gorm:"default:false"`
-	WarnCount    int       `json:"warnCount" gorm:"default:0"`
-	Warnings     []Warning `json:"warnings,omitempty" gorm:"foreignKey:UserID"`
+	ID             int        `json:"id" gorm:"primaryKey;autoIncrement"`
+	FirstName      string     `json:"firstName" gorm:"not null"`
+	SecondName     string     `json:"secondName" gorm:"not null"`
+	Nickname       string     `json:"nickname" gorm:"uniqueIndex;not null"` //Уникальный никнейм
+	PasswordHash   string     `json:"-" gorm:"not null"`
+	Role           string     `json:"role" gorm:"default:author"` //Роль: либо автор либо админ
+	CreatedAt      time.Time  `json:"createdAt"`
+	RegistrationIP string     `json:"registrationIp"`
+	LastLoginIP    string     `json:"lastLoginIp"`
+	LastLoginAt    *time.Time `json:"lastLoginAt,omitempty"`
+	IsBlocked      bool       `json:"isBlocked" gorm:"default:false"`
+	WarnCount      int        `json:"warnCount" gorm:"default:0"`
+	Warnings       []Warning  `json:"warnings,omitempty" gorm:"foreignKey:UserID"`
 }
 
 type Warning struct {

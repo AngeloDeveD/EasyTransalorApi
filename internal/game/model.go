@@ -26,6 +26,7 @@ type TranslateCard struct {
 	Version       float64             `json:"version"`
 	PercentReady  float64             `json:"percentReady"`
 	UrlToDownload string              `json:"urlToDownload"`
+	ArchiveHash   string              `json:"archiveHash" gorm:"index"`
 	FileSize      float64             `json:"fileSize"`
 	Status        string              `json:"status" gorm:"default:pending"` //pending, approved, rejected, error
 	ScanDetails   string              `json:"scanDetails" gorm:"default:''"`

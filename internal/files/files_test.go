@@ -36,6 +36,25 @@ func makeFileHeader(t *testing.T, field, filename, content string) *multipart.Fi
 	return fh
 }
 
+func makeFileHeaderBytes(t *testing.T, field, filename string, content []byte) *multipart.FileHeader {
+	t.Helper()
+
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+	fw, err := w.CreateFormFile(field, filename)
+	require.NoError(t, err)
+	_, err = fw.Write(content)
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	req := httptest.NewRequest("POST", "/", body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	require.NoError(t, req.ParseMultipartForm(32<<20))
+
+	_, fh, err := req.FormFile(field)
+	require.NoError(t, err)
+	return fh
+}
 func TestIsAllowedArchiveFormat(t *testing.T) {
 	repo := NewLocalFileRepo()
 
@@ -91,8 +110,8 @@ func TestIsAllowedImageFormat(t *testing.T) {
 func TestIsAllowedArchiveSize(t *testing.T) {
 	repo := NewLocalFileRepo()
 
-	assert.NoError(t, repo.IsAllowedArchiveSize(1<<20))     // 1 МБ — ок
-	assert.NoError(t, repo.IsAllowedArchiveSize(5<<30))     // ровно 5 ГБ — ещё ок
+	assert.NoError(t, repo.IsAllowedArchiveSize(1<<20))      // 1 МБ — ок
+	assert.NoError(t, repo.IsAllowedArchiveSize(5<<30))      // ровно 5 ГБ — ещё ок
 	assert.EqualError(t, repo.IsAllowedArchiveSize(5<<30+1), // 5 ГБ + 1 байт — превышение
 		"файл слишком большой!")
 }
@@ -154,8 +173,8 @@ func TestSaveImages_RoundTrip(t *testing.T) {
 	defer os.Chdir(old)
 
 	repo := NewLocalFileRepo()
-	big := makeFileHeader(t, "big_pic", "big.jpg", "big-content")
-	small := makeFileHeader(t, "small_pic", "small.png", "small-content")
+	big := makeFileHeaderBytes(t, "big_pic", "big.jpg", []byte{0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00})
+	small := makeFileHeaderBytes(t, "small_pic", "small.png", []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})
 
 	// SaveImages сам создаёт каталоги uploads/Icons/Big и uploads/Icons/Small.
 	urls, err := repo.SaveImages(big, small)

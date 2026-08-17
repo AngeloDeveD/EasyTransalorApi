@@ -1,6 +1,8 @@
 package files
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"mime/multipart"
@@ -9,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/google/uuid"
 )
 
@@ -36,10 +39,26 @@ var gb5 int64 = 5 << 30 //5гб
 var mb5 int64 = 5 << 20 //5мб
 
 func (r *LocalFileRepo) IsAllowedArchiveFormat(file *multipart.FileHeader) error {
-	allowFileExts := map[string]bool{".zip": true, ".7zip": true, ".rar": true}
+	allowFileExts := map[string]bool{".zip": true, ".7zip": true, ".7z": true, ".rar": true}
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	if !allowFileExts[ext] {
 		return errors.New("неподдерживаемый формат файла!")
+	}
+
+	mimeType, err := detectMultipartMime(file)
+	if err != nil {
+		return nil
+	}
+
+	allowedMimes := map[string]bool{
+		"application/zip":              true,
+		"application/x-zip-compressed": true,
+		"application/x-7z-compressed":  true,
+		"application/vnd.rar":          true,
+		"application/x-rar-compressed": true,
+	}
+	if !allowedMimes[mimeType] {
+		return errors.New("содержимое файла не похоже на поддерживаемый архив")
 	}
 	return nil
 }
@@ -50,14 +69,37 @@ func (r *LocalFileRepo) IsAllowedImageFormat(image *multipart.FileHeader) error 
 	if !allowImagesExts[ext] {
 		return errors.New("неподдерживаемый формат изображения")
 	}
+
+	mimeType, err := detectMultipartMime(image)
+	if err != nil {
+		return nil
+	}
+
+	allowedMimes := map[string]bool{"image/jpeg": true, "image/png": true, "image/webp": true}
+	if !allowedMimes[mimeType] {
+		return errors.New("содержимое файла не похоже на изображение")
+	}
 	return nil
 }
-
 func (r *LocalFileRepo) IsAllowedArchiveSize(fileSize int64) error {
 	if fileSize > gb5 {
 		return errors.New("файл слишком большой!")
 	}
 	return nil
+}
+
+func detectMultipartMime(file *multipart.FileHeader) (string, error) {
+	src, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+
+	mimeType, err := mimetype.DetectReader(src)
+	if err != nil {
+		return "", err
+	}
+	return mimeType.String(), nil
 }
 
 func (r *LocalFileRepo) IsAllowedImageSize(small_image_size int64, big_image_size int64) error {
@@ -90,6 +132,25 @@ func saveFile(file *multipart.FileHeader, savePath string) error {
 	return nil
 }
 
+func StaticURLToPath(fileURL string) string {
+	fileURL = strings.ReplaceAll(fileURL, `\`, "/")
+	return filepath.FromSlash(strings.Replace(fileURL, "/static/", "uploads/", 1))
+}
+
+func CalculateSHA256(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
 func (r *LocalFileRepo) SaveArchive(gameid int, file *multipart.FileHeader) (string, error) {
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	newFile := uuid.New().String() + ext

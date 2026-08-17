@@ -17,6 +17,7 @@ type UserRepository interface {
 	WarnUser(id int, reason string) error
 	UnwarnUser(id int) error
 	SetRole(id int, role string) error
+	UpdateLastLoginInfo(id int, ip string) error
 }
 
 type SqlUserRepo struct {
@@ -59,6 +60,17 @@ func (r *SqlUserRepo) GetUserByNickname(nickname string) (*User, error) {
 	return &user, nil
 }
 
+func (r *SqlUserRepo) UpdateLastLoginInfo(id int, ip string) error {
+	now := time.Now()
+	result := r.db.Model(&User{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"last_login_ip": ip,
+		"last_login_at": now,
+	})
+	if result.RowsAffected == 0 {
+		return errors.New("Пользователь не найден")
+	}
+	return result.Error
+}
 func (r *SqlUserRepo) BlockUser(id int) error {
 	result := r.db.Model(&User{}).Where("id = ?", id).Update("is_blocked", true)
 	if result.RowsAffected == 0 {

@@ -73,6 +73,15 @@ func (r *InMemoryUserRepo) GetUsers(limit int, offset int) ([]User, int64, error
 	return r.users[offset:end], total, nil
 }
 
+func (r *InMemoryUserRepo) UpdateLastLoginInfo(id int, ip string) error {
+	for i := range r.users {
+		if r.users[i].ID == id {
+			r.users[i].LastLoginIP = ip
+			return nil
+		}
+	}
+	return errors.New("не найден")
+}
 func (r *InMemoryUserRepo) BlockUser(id int) error {
 	for i := range r.users {
 		if r.users[i].ID == id {
