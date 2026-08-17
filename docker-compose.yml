@@ -19,7 +19,48 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Твое Go-приложение
+  # 2. Антивирусный демон ClamAV (слушает TCP 3310)
+  clamav:
+    image: clamav/clamav:latest
+    ports:
+      - "3310:3310"
+    # volumes:
+    #   # Кэшируем базы сигнатур, чтобы не качать ~200МБ при каждом рестарте
+    #   - clamav_db:/var/lib/clamav
+    #   # Кастомный конфиг: поднимает лимиты размеров до 4ГБ (иначе StreamMaxLength=10M
+    #   # роняет INSTREAM с Broken pipe на файлах крупнее 10МБ). read-only — образ его не переписывает.
+    #   - ./clamav/clamd.conf:/etc/clamav/clamd.conf:ro
+    healthcheck:
+      # Скрипт из образа: пингует clamd, готов только после загрузки баз
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      # Первый старт качает базы — даём время не падать в unhealthy
+      start_period: 180s
+
+  # 3. Сканер архивов (FastAPI): magic-байты -> safe-extract -> ClamAV -> YARA
+  scanner:
+    build: ./scanner
+    environment:
+      # ClamAV по TCP (см. config.py: если задан CLAMD_HOST — работаем по сети)
+      - CLAMD_HOST=clamav
+      - CLAMD_PORT=3310
+      - CLAMD_ENABLED=true
+      # Песочница выключена: достаточно статического анализа ClamAV + YARA
+      - SANDBOX_ENABLED=false
+      # Куда сканер шлёт вердикт (имя сервиса api в этой же сети)
+      - MAIN_API_URL=http://api:8080/api/internal/scan-result
+      # Общий секрет для внутренней авторизации (должен совпадать с api)
+      - INTERNAL_KEY=super_secret_cloud_key_998
+    volumes:
+      # Тот же том с загрузками, что и у api — сканер читает архив по пути от Go
+      - ./uploads:/app/uploads:ro
+    depends_on:
+      clamav:
+        condition: service_healthy
+
+  # 4. Твое Go-приложение
   api:
     build: .
     ports:
@@ -34,13 +75,27 @@ services:
       - DB_PASS=secret
       - DB_NAME=translations_db
       - JWT_SECRET=super_duper_secret_prod_key_998
+      # Внутренний секрет и адрес сканера (имя сервиса scanner в этой же сети)
+      - INTERNAL_KEY=super_secret_cloud_key_998
+      - SCANNER_URL=http://scanner:8000/scan
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_GLOBAL_REQUESTS=120
+      - RATE_LIMIT_GLOBAL_WINDOW=1m
+      - RATE_LIMIT_AUTH_REQUESTS=10
+      - RATE_LIMIT_AUTH_WINDOW=1m
+      - RATE_LIMIT_WRITE_REQUESTS=1
+      - RATE_LIMIT_WRITE_WINDOW=10s
     volumes:
       # Сохраняем загруженные файлы на твоем компе, чтобы они не пропали при остановке контейнера
       - ./uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy # Ждем, пока БД скажет, что готова
+      scanner:
+        condition: service_started
 
-# Объявляем постоянный том для базы данных
+# Объявляем постоянные тома
 volumes:
   postgres_data:
+  clamav_db:

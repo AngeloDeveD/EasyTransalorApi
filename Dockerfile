@@ -1,5 +1,7 @@
 # --- Этап 1: Сборка приложения ---
-FROM golang:1.22-alpine AS builder
+# Версия образа должна быть не ниже go-директивы в go.mod (сейчас go 1.26.3),
+# иначе тулчейн откажется собирать модуль.
+FROM golang:1.26-alpine AS builder
 
 # Устанавливаем git (нужен для go mod) и gcc (нужен для SQLite)
 RUN apk add --no-cache git gcc musl-dev

@@ -12,6 +12,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+
+	"myapi/internal/notification"
 )
 
 func TestMain(m *testing.M) {
@@ -50,7 +52,7 @@ func (r *InMemoryUserRepo) GetUserByNickname(nickname string) (*User, error) {
 	return nil, errors.New("пользователь не найден")
 }
 
-func (r *InMemoryUserRepo) GetUserByID(id int) (*User, error) {
+func (r *InMemoryUserRepo) GetUserById(id int) (*User, error) {
 	for i, u := range r.users {
 		if u.ID == id {
 			return &r.users[i], nil
@@ -114,11 +116,27 @@ func (r *InMemoryUserRepo) UnwarnUser(id int) error {
 	return errors.New("нет варнов")
 }
 
-// Локальный мок для уведомлений (чтобы не тянуть зависимость в тесты)
+func (r *InMemoryUserRepo) SetRole(id int, role string) error {
+	if role != RoleAuthor && role != RoleModerator && role != RoleAdmin {
+		return errors.New("Недопустимая роль")
+	}
+	for i := range r.users {
+		if r.users[i].ID == id {
+			r.users[i].Role = role
+			return nil
+		}
+	}
+	return errors.New("не найден")
+}
+
+// Локальный мок для уведомлений (чтобы не тянуть БД в тесты).
+// Сигнатуры должны точно совпадать с notification.NotificationRepository.
 type mockNotifRepo struct{}
 
-func (m *mockNotifRepo) Create(n interface{}) error                   { return nil }
-func (m *mockNotifRepo) GetForUser(userID int) ([]interface{}, error) { return nil, nil }
+func (m *mockNotifRepo) Create(n *notification.Notification) error { return nil }
+func (m *mockNotifRepo) GetForUser(userID int) ([]notification.Notification, error) {
+	return nil, nil
+}
 
 // Настройка роутера с реальными middleware
 func setupTestRouter() *gin.Engine {
@@ -126,8 +144,8 @@ func setupTestRouter() *gin.Engine {
 	jwtManager := NewJWTManager("test_secret_key")
 	authHandler := NewAuthHandler(repo, jwtManager)
 
-	// Передаем заглушку notifRepo (nil безопасен, если мы не тестируем отправку уведомлений в этом файле)
-	adminHandler := NewAdminHandler(repo, nil)
+	// WarnUser отправляет уведомление, поэтому передаём рабочий мок, а не nil.
+	adminHandler := NewAdminHandler(repo, &mockNotifRepo{})
 
 	r := gin.New()
 

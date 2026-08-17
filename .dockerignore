@@ -18,3 +18,5 @@ vendor/
 # Локальные папки
 uploads/
 .git/
+__pycache__/
+test_files/

@@ -47,6 +47,30 @@ func (h *ModerationHandler) GetQueue(c *gin.Context) {
 	})
 }
 
+// PATCH /api/admin/moderation/:transid/change-status/:status
+func (h *ModerationHandler) ChangeStatus(c *gin.Context) {
+	transId, err := strconv.Atoi(c.Param("transid"))
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status := c.Param("status")
+
+	if status == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Статус не найден!"})
+		return
+	}
+
+	if err := h.GameRepo.ChangeStatusTranslation(transId, status); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Статус перевода изменён"})
+}
+
 // PATCH /api/admin/moderation/:transid/approve
 func (h *ModerationHandler) Approve(c *gin.Context) {
 	transIdStr := c.Param("transid")

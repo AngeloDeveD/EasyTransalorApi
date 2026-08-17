@@ -7,6 +7,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Роли пользователей в системе.
+// author    — обычный пользователь (значение по умолчанию);
+// moderator — почти как админ, но НЕ может назначать роли другим;
+// admin      — создатель, может всё, включая назначение ролей.
+const (
+	RoleAuthor    = "author"
+	RoleModerator = "moderator"
+	RoleAdmin     = "admin"
+)
+
 func AuthMiddleware(jwt *JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString := ""
@@ -47,8 +57,36 @@ func AuthMiddleware(jwt *JWTManager) gin.HandlerFunc {
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
-		if !exists || role != "admin" {
+		if !exists || role != RoleAdmin {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ запрещен. Требуются права администратора."})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// ModeratorMiddleware пропускает и модераторов, и админов.
+// Используется для действий, которые доступны модератору («почти как админ»):
+// модерация переводов, блокировки/предупреждения, управление играми, рассылка уведомлений.
+// Назначение ролей другим пользователям сюда НЕ входит — оно остаётся за AdminMiddleware.
+func ModeratorMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, exists := c.Get("role")
+		if !exists || (role != RoleAdmin && role != RoleModerator) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ запрещен. Требуются права модератора или администратора."})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func APIKeyMiddleware(validKey string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := c.GetHeader("X-Internal-Key")
+		if key == "" || key != validKey {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный сервисный ключ"})
 			c.Abort()
 			return
 		}

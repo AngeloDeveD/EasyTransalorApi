@@ -1,8 +1,8 @@
 package game
 
 import (
+	"encoding/json"
 	"errors"
-
 	"time"
 
 	"gorm.io/gorm"
@@ -23,6 +23,9 @@ type GameRepository interface {
 	GetModerationQueue(limit int, offset int) ([]TranslateCard, int, error)
 	ApproveTranslation(translationId int) error
 	RejectTranslation(translationId int) error
+	ChangeStatusTranslation(translationId int, status string) error
+	UpdateScanResult(transID int, status string, details string) error
+	UpdateFileInfo(transId int, filesInfo []DetailedGameFiles) error
 }
 
 type SqliteGameRepo struct {
@@ -180,7 +183,7 @@ func (r *SqliteGameRepo) DeleteGame(gameId int) error {
 	}
 
 	//Удаление GameCard
-	if err := tx.Delete(&GameCard{}, gameId).Error; err != nil {
+	if err := tx.Where("game_id = ?", gameId).Delete(&GameCard{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -238,6 +241,43 @@ func (r *SqliteGameRepo) RejectTranslation(translationId int) error {
 	}
 
 	return result.Error
+}
+
+func (r *SqliteGameRepo) ChangeStatusTranslation(translationId int, status string) error {
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", status)
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+
+	return result.Error
+}
+
+func (r *SqliteGameRepo) UpdateScanResult(transID int, status string, details string) error {
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", transID).Updates(map[string]interface{}{
+		"status":       status,
+		"scan_details": details,
+	})
+
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+	return result.Error
+}
+
+func (r *SqliteGameRepo) UpdateFileInfo(transId int, filesInfo []DetailedGameFiles) error {
+	filesJSON, err := json.Marshal(filesInfo)
+	if err != nil {
+		return err
+	}
+
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", transId).Update("game_files", string(filesJSON))
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+	return nil
 }
 
 /*Для тестов*/
@@ -350,3 +390,66 @@ func (r *InMemoryGameRepo) GetModerationQueue(limit int, offset int) ([]Translat
 
 func (r *InMemoryGameRepo) ApproveTranslation(translationId int) error { return nil }
 func (r *InMemoryGameRepo) RejectTranslation(translationId int) error  { return nil }
+
+func (r *InMemoryGameRepo) ChangeStatusTranslation(translationId int, status string) error {
+	for i := range r.gameInfo {
+		for j := range r.gameInfo[i].TranslateCards {
+			if r.gameInfo[i].TranslateCards[j].ID == translationId {
+				r.gameInfo[i].TranslateCards[j].Status = status
+				return nil
+			}
+		}
+	}
+	return errors.New("перевод не найден")
+}
+
+// GetOldRejectedTranslations в тестах отдаёт все отклонённые переводы
+// (без учёта возраста — в памяти нет реальных дат создания).
+func (r *InMemoryGameRepo) GetOldRejectedTranslations(daysOld int) ([]TranslateCard, error) {
+	var cards []TranslateCard
+	for _, game := range r.gameInfo {
+		for _, card := range game.TranslateCards {
+			if card.Status == "rejected" {
+				cards = append(cards, card)
+			}
+		}
+	}
+	return cards, nil
+}
+
+// DeleteRejectedTranslation удаляет перевод по id из памяти.
+func (r *InMemoryGameRepo) DeleteRejectedTranslation(id int) error {
+	for i := range r.gameInfo {
+		for j, card := range r.gameInfo[i].TranslateCards {
+			if card.ID == id {
+				r.gameInfo[i].TranslateCards = append(r.gameInfo[i].TranslateCards[:j], r.gameInfo[i].TranslateCards[j+1:]...)
+				return nil
+			}
+		}
+	}
+	return errors.New("перевод не найден")
+}
+
+func (r *InMemoryGameRepo) UpdateScanResult(transID int, status string, details string) error {
+	for i, game := range r.gameInfo {
+		for j, card := range game.TranslateCards {
+			if card.ID == transID {
+				r.gameInfo[i].TranslateCards[j].Status = status
+				r.gameInfo[i].TranslateCards[j].ScanDetails = details
+				return nil
+			}
+		}
+	}
+	return errors.New("перевод не найден")
+}
+func (r *InMemoryGameRepo) UpdateFileInfo(transID int, filesInfo []DetailedGameFiles) error {
+	for i, game := range r.gameInfo {
+		for j, card := range game.TranslateCards {
+			if card.ID == transID {
+				r.gameInfo[i].TranslateCards[j].GameFiles = filesInfo
+				return nil
+			}
+		}
+	}
+	return errors.New("перевод не найден")
+}

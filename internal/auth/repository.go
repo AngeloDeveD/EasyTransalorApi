@@ -16,6 +16,7 @@ type UserRepository interface {
 	UnblockUser(id int) error
 	WarnUser(id int, reason string) error
 	UnwarnUser(id int) error
+	SetRole(id int, role string) error
 }
 
 type SqlUserRepo struct {
@@ -69,6 +70,21 @@ func (r *SqlUserRepo) BlockUser(id int) error {
 
 func (r *SqlUserRepo) UnblockUser(id int) error {
 	result := r.db.Model(&User{}).Where("id = ?", id).Update("is_blocked", false)
+	if result.RowsAffected == 0 {
+		return errors.New("Пользователь не найден")
+	}
+
+	return result.Error
+}
+
+// SetRole меняет роль пользователя. Допускаются только известные роли
+// (author / moderator / admin), чтобы в БД не попало произвольное значение.
+func (r *SqlUserRepo) SetRole(id int, role string) error {
+	if role != RoleAuthor && role != RoleModerator && role != RoleAdmin {
+		return errors.New("Недопустимая роль")
+	}
+
+	result := r.db.Model(&User{}).Where("id = ?", id).Update("role", role)
 	if result.RowsAffected == 0 {
 		return errors.New("Пользователь не найден")
 	}
