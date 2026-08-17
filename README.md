@@ -143,6 +143,19 @@ docker compose down -v
 
 ---
 
+## Миграции БД
+
+При старте API применяет версионированные миграции из `internal/migrations` и записывает применённые версии в таблицу `schema_migrations`.
+
+Правила изменения схемы:
+
+1. Добавляйте новую миграцию с новым ID в `internal/migrations`.
+2. Не меняйте уже применённые миграции задним числом.
+3. Проверяйте изменения через `go test ./...` или Docker-прогон из CI.
+
+
+---
+
 ## Переменные окружения (`.env`)
 
 Создайте файл `.env` в корне проекта при необходимости переопределить стандартные значения:
@@ -156,13 +169,14 @@ POSTGRES_DB=translations_db
 # Безопасность и авторизация
 JWT_SECRET=super_duper_secret_prod_key_998
 INTERNAL_KEY=super_secret_cloud_key_998
+ENCRYPT_KEY=12345678901234567890123456789012
 
 # Конфигурация ClamAV
 CLAMD_HOST=clamav
 CLAMD_PORT=3310
 
 # Настройки Webhook
-MAIN_API_URL=http://api:8080/api/internal/scan-result
+API_WEBHOOK_URL=http://api:8080/api/internal/scan-result
 ```
 ---
 

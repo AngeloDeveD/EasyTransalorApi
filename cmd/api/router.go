@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "myapi/docs"
+	"myapi/internal/audit"
 	"myapi/internal/auth"
 	"myapi/internal/chat"
 	"myapi/internal/config"
@@ -19,7 +20,10 @@ import (
 )
 
 func setupRouter(cfg *config.Config) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(requestIDMiddleware())
+	r.Use(requestLoggerMiddleware())
+	r.Use(recoveryLoggerMiddleware())
 	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 
 	limiter := ratelimit.NewMemoryLimiter()
@@ -35,6 +39,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	}
 
 	// --- Инициализация репозиториев ---
+	auditRepo := audit.NewSqlRepository(db)
 	authRepo := auth.NewSqlUserRepo(db)
 	notifRepo := notification.NewSqlNotificationRepo(db)
 	fileRepo := files.NewLocalFileRepo()
@@ -60,7 +65,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	notification.SetupNotificationRoutes(r, notifHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware())
 
 	// Админка
-	adminHandler := auth.NewAdminHandler(authRepo, notifRepo)
+	adminHandler := auth.NewAdminHandler(authRepo, notifRepo, auditRepo)
 	auth.SetupAdminRoutes(r, adminHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware(), auth.AdminMiddleware())
 
 	// Игры
@@ -77,7 +82,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	chat.SetupChatRoutes(r, chatHandler, auth.AuthMiddleware(jwtManager))
 
 	// Модерация
-	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo)
+	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo, auditRepo)
 	game.SetupModerationRoutes(r, moderationHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware())
 
 	// Внутренние роуты (для Python-сканера)
@@ -95,6 +100,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
 	})
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// Healthcheck
 	r.GET("/", func(c *gin.Context) {

@@ -50,7 +50,7 @@ services:
       # Песочница выключена: достаточно статического анализа ClamAV + YARA
       - SANDBOX_ENABLED=false
       # Куда сканер шлёт вердикт (имя сервиса api в этой же сети)
-      - MAIN_API_URL=http://api:8080/api/internal/scan-result
+      - API_WEBHOOK_URL=http://api:8080/api/internal/scan-result
       # Общий секрет для внутренней авторизации (должен совпадать с api)
       - INTERNAL_KEY=super_secret_cloud_key_998
     volumes:
@@ -60,7 +60,6 @@ services:
       clamav:
         condition: service_healthy
 
-  # 4. Твое Go-приложение
   api:
     build: .
     ports:
@@ -75,6 +74,7 @@ services:
       - DB_PASS=secret
       - DB_NAME=translations_db
       - JWT_SECRET=super_duper_secret_prod_key_998
+      - ENCRYPT_KEY=12345678901234567890123456789012
       # Внутренний секрет и адрес сканера (имя сервиса scanner в этой же сети)
       - INTERNAL_KEY=super_secret_cloud_key_998
       - SCANNER_URL=http://scanner:8000/scan

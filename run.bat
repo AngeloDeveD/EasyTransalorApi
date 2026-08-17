@@ -89,8 +89,8 @@ set "bar_total=25"
 if exist "%STATUS_FILE%" goto finish_progress
 
 :: Увеличиваем процент пока идет процесс
-if !progress! LSS 92 (
-    set /a progress+=3
+if !progress! LSS 98 (
+    set /a progress+=2
 )
 
 :: Формируем строку ползунка

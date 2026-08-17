@@ -12,7 +12,7 @@ func TestLoad_Defaults(t *testing.T) {
 	// Обнуляем все переменные окружения, которые читает Load.
 	for _, k := range []string{
 		"APP_PORT", "DB_TYPE", "DB_NAME", "DB_HOST", "DB_PORT",
-		"DB_USER", "DB_PASS", "JWT_SECRET", "EncryptKey", "InternalKey",
+		"DB_USER", "DB_PASS", "JWT_SECRET", "EncryptKey", "ENCRYPT_KEY", "InternalKey", "INTERNAL_KEY",
 		"SCANNER_URL", "SCANNER_FILE_ROOT", "CORS_ALLOWED_ORIGINS",
 		"RATE_LIMIT_ENABLED", "RATE_LIMIT_GLOBAL_REQUESTS", "RATE_LIMIT_GLOBAL_WINDOW",
 		"RATE_LIMIT_AUTH_REQUESTS", "RATE_LIMIT_AUTH_WINDOW",
@@ -55,8 +55,8 @@ func TestLoad_Overrides(t *testing.T) {
 	t.Setenv("DB_USER", "admin")
 	t.Setenv("DB_PASS", "hunter2")
 	t.Setenv("JWT_SECRET", "my-jwt")
-	t.Setenv("EncryptKey", "abcdefghijklmnopqrstuvwxyz012345")
-	t.Setenv("InternalKey", "my-internal")
+	t.Setenv("ENCRYPT_KEY", "abcdefghijklmnopqrstuvwxyz012345")
+	t.Setenv("INTERNAL_KEY", "my-internal")
 	t.Setenv("SCANNER_URL", "http://scanner:8000/scan")
 	t.Setenv("SCANNER_FILE_ROOT", "/data/uploads")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "https://app.example.com, https://admin.example.com")

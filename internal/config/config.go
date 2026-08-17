@@ -85,11 +85,11 @@ func Load() *Config {
 	if jwtSecret == "" {
 		jwtSecret = "super_secret_dev_key_123"
 	}
-	encryptKey := os.Getenv("EncryptKey")
+	encryptKey := firstEnv("EncryptKey", "ENCRYPT_KEY")
 	if encryptKey == "" {
 		encryptKey = "12345678901234567890123456789012"
 	}
-	internalKey := os.Getenv("InternalKey")
+	internalKey := firstEnv("InternalKey", "INTERNAL_KEY")
 	if internalKey == "" {
 		internalKey = `super_secret_cloud_key_998`
 	}
@@ -195,4 +195,14 @@ func parseDurationEnv(key string, defaultValue time.Duration) time.Duration {
 		return defaultValue
 	}
 	return value
+}
+
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		value := os.Getenv(key)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

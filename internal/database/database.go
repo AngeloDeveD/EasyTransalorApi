@@ -3,10 +3,12 @@ package database
 import (
 	"fmt"
 	"log"
+	"myapi/internal/audit"
 	"myapi/internal/auth"
 	"myapi/internal/chat"
 	"myapi/internal/config"
 	"myapi/internal/game"
+	"myapi/internal/migrations"
 	"myapi/internal/notification"
 
 	"gorm.io/driver/postgres"
@@ -38,8 +40,14 @@ func ConnectDB(cfg *config.Config) (*gorm.DB, error) {
 		log.Println("Подключено к SQLite")
 	}
 
-	// Миграции (работают одинаково для обеих БД!)
+	if err := migrations.Run(db, cfg.DBType); err != nil {
+		return nil, fmt.Errorf("ошибка применения миграций БД: %w", err)
+	}
+
+	// Compatibility pass для разработки: миграции фиксируют историю схемы,
+	// AutoMigrate страхует тесты и локальную БД от мелких расхождений моделей.
 	err = db.AutoMigrate(
+		&audit.Event{},
 		&auth.User{},
 		&auth.Warning{},
 		&game.GameCard{},
@@ -49,7 +57,7 @@ func ConnectDB(cfg *config.Config) (*gorm.DB, error) {
 		&chat.ChatMessage{},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка миграции БД: %w", err)
+		return nil, fmt.Errorf("ошибка синхронизации моделей БД: %w", err)
 	}
 
 	return db, nil

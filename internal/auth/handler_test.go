@@ -73,6 +73,16 @@ func (r *InMemoryUserRepo) GetUsers(limit int, offset int) ([]User, int64, error
 	return r.users[offset:end], total, nil
 }
 
+func (r *InMemoryUserRepo) UpdateLastLoginInfo(id int, ip string) error {
+	for i := range r.users {
+		if r.users[i].ID == id {
+			r.users[i].LastLoginIP = ip
+			return nil
+		}
+	}
+	return errors.New("не найден")
+}
+
 func (r *InMemoryUserRepo) BlockUser(id int) error {
 	for i := range r.users {
 		if r.users[i].ID == id {
@@ -233,6 +243,7 @@ func TestAdminGetUsers(t *testing.T) {
 	w := makeRequest(r, "GET", "/api/admin/users", nil, adminToken)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "user1")
+	assert.Contains(t, w.Body.String(), "registrationIp")
 }
 
 func TestAdminBlockUser(t *testing.T) {
