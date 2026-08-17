@@ -59,7 +59,7 @@ class ScanPipeline:
                             return result
                     else:
                         pass
-                    
+
                     # Б. Проверка YARA
                     yara_matches = yara_scanner.scan_file(file_path)
                     if yara_matches:
@@ -80,7 +80,7 @@ class ScanPipeline:
             }
         except Exception as e:
             return {
-                "status": "error",
+                "status": "pending",
                 "is_safe": False,
                 "threats": [],
                 "error": f"Ошибка сканирования: {str(e)}"

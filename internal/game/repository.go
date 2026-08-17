@@ -23,6 +23,7 @@ type GameRepository interface {
 	GetModerationQueue(limit int, offset int) ([]TranslateCard, int, error)
 	ApproveTranslation(translationId int) error
 	RejectTranslation(translationId int) error
+	ChangeStatusTranslation(translationId int, status string) error
 	UpdateScanResult(transID int, status string, details string) error
 }
 
@@ -181,7 +182,7 @@ func (r *SqliteGameRepo) DeleteGame(gameId int) error {
 	}
 
 	//Удаление GameCard
-	if err := tx.Delete(&GameCard{}, gameId).Error; err != nil {
+	if err := tx.Where("game_id = ?", gameId).Delete(&GameCard{}).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -234,6 +235,15 @@ func (r *SqliteGameRepo) ApproveTranslation(translationId int) error {
 
 func (r *SqliteGameRepo) RejectTranslation(translationId int) error {
 	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", "reject")
+	if result.RowsAffected == 0 {
+		return errors.New("Перевод не найден")
+	}
+
+	return result.Error
+}
+
+func (r *SqliteGameRepo) ChangeStatusTranslation(translationId int, status string) error {
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", status)
 	if result.RowsAffected == 0 {
 		return errors.New("Перевод не найден")
 	}

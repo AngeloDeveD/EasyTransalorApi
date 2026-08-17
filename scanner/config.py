@@ -15,6 +15,9 @@ class Config:
     CLAMAV_TIMEOUT: int = 300                            # 5 минут
     CLAMAV_ENABLED: bool = os.getenv("CLAMD_ENABLED", "true").lower() in ("true", "1", "yes")
 
+    API_WEBHOOK_URL = os.getenv("API_WEBHOOK_URL", "http://api:8080/api/internal/scan-result")
+    INTERNAL_KEY = os.getenv("INTERNAL_KEY", "your-secret-internal-key")
+
     # Расширения исполняемых файлов и скриптов
     EXECUTABLE_EXTENSIONS: set = {
         '.dll', '.exe', '.asi', '.cleo', '.so', '.dylib', '.sys',

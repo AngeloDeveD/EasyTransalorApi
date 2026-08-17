@@ -35,7 +35,7 @@ func NewGameHandler(repo GameRepository, fileRepo files.FileRepository, scanner 
 
 // Проверка id перевода и игры
 // Проверяет на отсутвие символов и на то, чтобы в id были только числа
-func CheckGameId(gameId string) (int, error) {
+func CheckGameIdForNumValue(gameId string) (int, error) {
 	if len(gameId) == 0 {
 		return -1, errors.New("Id игры не был получен")
 	}
@@ -77,7 +77,7 @@ func (h *GameHandler) GetGames(c *gin.Context) {
 func (h *GameHandler) GetGameById(c *gin.Context) {
 
 	//получение параметров с url
-	gameid, err := CheckGameId(c.Param("gameid"))
+	gameid, err := CheckGameIdForNumValue(c.Param("gameid"))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -93,61 +93,42 @@ func (h *GameHandler) GetGameById(c *gin.Context) {
 	c.JSON(http.StatusAccepted, game)
 }
 
-// GET /download/:gameid/:translid
-/*Устанавливаем архив файла с переводом*/
-// GET /download/:gameid/:translid
+// GET /download/:transid
 /*Устанавливаем архив файла с переводом*/
 func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
-	gameId, err := CheckGameId(c.Param("gameid"))
+	transid, err := CheckGameIdForNumValue(c.Param("transid"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	transid, err := CheckGameId(c.Param("translid"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID перевода"})
 		return
 	}
 
-	if err := h.Repo.CheckCreatedGame(gameId); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра не найдена!"})
-		return
-	}
-
-	gameInfo, err := h.Repo.GetGameInfoById(gameId)
+	card, err := h.Repo.GetTranslationByID(transid)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Перевод не найден"})
 		return
 	}
 
-	var fileUrl string
-	var author string
-	found := false
-
-	for _, card := range gameInfo.TranslateCards {
-		if card.ID == transid {
-			if card.Status != "approved" {
-				// Получениие роли пользователя
-				role, exists := c.Get("role")
-				if !exists || role != "admin" {
-					c.JSON(http.StatusForbidden, gin.H{"error": "Доступ закрыт. Файл находится на модерации."})
-					return
-				}
-			}
-			fileUrl = card.UrlToDownload
-			author = card.AuthorName
-			found = true
-			break
+	if card.Status != "approved" {
+		role, exist := c.Get("role")
+		if !exist || role != "moderation" || role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ закрыт. Файл находится на модерации."})
+			return
 		}
 	}
 
-	if !found {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Перевод не найден"})
+	gameInfo, err := h.Repo.GetGameInfoById(card.GameInfoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить данные об игре"})
 		return
 	}
 
-	// Внутри метода DownloadGameTranslation:
+	fileUrl := card.UrlToDownload
+	author := card.AuthorName
 
 	if fileUrl != "" {
 		// Просим репозиторий дать нам путь к файлу
@@ -270,7 +251,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	}
 
 	//получение параметров с url
-	gameid, err := CheckGameId(c.Param("gameid"))
+	gameid, err := CheckGameIdForNumValue(c.Param("gameid"))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -373,7 +354,7 @@ func (h *GameHandler) DeleteGame(c *gin.Context) {
 		return
 	}
 
-	_ = h.FileRepo.DeleteArchiveFile(gameId)
+	_ = h.FileRepo.DeleteGameFiles(gameId)
 
 	//Удаление иконок
 	if gameInfo.IconUrl != "" {
@@ -383,55 +364,34 @@ func (h *GameHandler) DeleteGame(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"error": "Игра вместе с переводами была удалена"})
 }
 
-//DELETE /games/translate/:gameid/:transid
+//DELETE /games/translate/:transid
 /*Удаление перевода из игры*/
 func (h *GameHandler) DeleteTranslation(c *gin.Context) {
 
-	gameId, err := CheckGameId(c.Param("gameid"))
+	translationId, err := CheckGameIdForNumValue(c.Param("transid"))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	translationId, err := CheckGameId(c.Param("transid"))
-
+	card, err := h.Repo.GetTranslationByID(translationId)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Перевод не найден"})
 		return
 	}
 
-	//Получение информации об игре для получения перевода и его пути к архиву
-	gameInfo, err := h.Repo.GetGameInfoById(gameId)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Игра не найдена"})
+	//Удаление записи с бд
+	if err := h.Repo.DeleteTranslation(card.GameInfoID, translationId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	var fileUrl string
-	found := false
-	for _, card := range gameInfo.TranslateCards {
-		if card.ID == translationId {
-			fileUrl = card.UrlToDownload
-			found = true
-			break
-		}
-	}
+	//Удаление файла с диска
+	fileUrl := card.UrlToDownload
 
-	if !found {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Перевод не найден"})
-		return
-	}
-
-	//Удаление записи из БД
-	if err := h.Repo.DeleteTranslation(gameId, translationId); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	//Удаление файла из диска
 	if fileUrl != "" {
-		_ = h.FileRepo.DeleteOneImageFile(fileUrl)
+		_ = h.FileRepo.DeleteFile(fileUrl)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Перевод успешно удалён"})

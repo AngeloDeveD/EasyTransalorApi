@@ -109,18 +109,18 @@ python scanner/test_scanner.py
 
 ## Управление базой данных и очистка
 
-* **Просмотр логов антивирусного сканера:**
-  ```bash
-  docker compose logs -f scanner
-  ```
-* **Просмотр логов основного API:**
-  ```bash
-  docker compose logs -f api
-  ```
-* **Полная очистка базы данных PostgreSQL:**
-  ```bash
-  docker compose down -v
-  ```
+**Просмотр логов антивирусного сканера:**
+```bash
+docker compose logs -f scanner
+```
+**Просмотр логов основного API:**
+```bash
+docker compose logs -f api
+```
+**Полная очистка базы данных PostgreSQL:**
+```bash
+docker compose down -v
+```
 
 ---
 

@@ -11,7 +11,7 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.H
 		public.GET("/cards", handler.GetCards)
 		public.GET("/games", handler.GetGames)
 		public.GET("/games/:gameid", handler.GetGameById)
-		public.GET("/download/:gameid/:translid", handler.DownloadGameTranslation)
+		public.GET("/download/:transid", handler.DownloadGameTranslation)
 	}
 
 	private := router.Group("", authHandler)
@@ -23,7 +23,7 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.H
 	adminOnly := router.Group("", authHandler, adminHandler)
 	{
 		adminOnly.DELETE("/games/:gameid", handler.DeleteGame)
-		adminOnly.DELETE("/games/translate/:gameid/:transid", handler.DeleteTranslation)
+		adminOnly.DELETE("/games/translate/:transid", handler.DeleteTranslation)
 	}
 
 }

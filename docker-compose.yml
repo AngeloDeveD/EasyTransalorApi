@@ -44,8 +44,9 @@ services:
     build: ./scanner
     environment:
       # ClamAV по TCP (см. config.py: если задан CLAMD_HOST — работаем по сети)
-      - CLAMAV_HOST=clamav
-      - CLAMAV_PORT=3310
+      - CLAMD_HOST=clamav
+      - CLAMD_PORT=3310
+      - CLAMD_ENABLED=true
       # Песочница выключена: достаточно статического анализа ClamAV + YARA
       - SANDBOX_ENABLED=false
       # Куда сканер шлёт вердикт (имя сервиса api в этой же сети)

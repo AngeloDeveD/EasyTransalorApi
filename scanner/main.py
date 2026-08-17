@@ -13,10 +13,7 @@ logger = logging.getLogger("scanner")
 
 app = FastAPI(title="Game Translation & Mod Security Scanner")
 
-# URL Go API для отправки результатов проверки
-API_WEBHOOK_URL = os.getenv("API_WEBHOOK_URL", "http://api:8080/api/internal/scan-result")
-INTERNAL_KEY = os.getenv("INTERNAL_KEY", "your-secret-internal-key")
-
+config = Config()
 
 # Модель входящего запроса от Go
 class ScanRequest(BaseModel):
@@ -63,18 +60,18 @@ async def process_scan_and_notify(trans_id: int, file_path: str):
     # Отправляем вердикт обратно в Go API
     headers = {
         "Content-Type": "application/json",
-        "X-Internal-Key": INTERNAL_KEY
+        "X-Internal-Key": config.INTERNAL_KEY
     }
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            resp = await client.post(API_WEBHOOK_URL, json=payload, headers=headers)
+            resp = await client.post(config.API_WEBHOOK_URL, json=payload, headers=headers)
             if resp.status_code == 200:
                 logger.info(f"Go API успешно принял результат для transId={trans_id}")
             else:
                 logger.error(f"Go API ответил ошибкой {resp.status_code}: {resp.text}")
         except Exception as e:
-            logger.error(f"Не удалось доставить результат в Go API ({API_WEBHOOK_URL}): {e}")
+            logger.error(f"Не удалось доставить результат в Go API ({config.API_WEBHOOK_URL}): {e}")
 
 
 @app.post("/scan")
@@ -84,7 +81,7 @@ async def scan_endpoint(
     x_internal_key: Optional[str] = Header(None, alias="X-Internal-Key")
 ):
     # Проверка безопасности между контейнерами
-    if INTERNAL_KEY and x_internal_key != INTERNAL_KEY:
+    if config.INTERNAL_KEY and x_internal_key != config.INTERNAL_KEY:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Invalid X-Internal-Key"

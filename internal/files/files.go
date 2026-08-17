@@ -19,9 +19,9 @@ type FileRepository interface {
 	IsAllowedImageFormat(file *multipart.FileHeader) error
 	IsAllowedArchiveSize(fileSize int64) error
 	IsAllowedImageSize(small_image_size int64, big_image_size int64) error
-	DeleteArchiveFile(gameId int) error
+	DeleteGameFiles(gameId int) error
 	DeleteImageFiles(big_img_url string) error
-	DeleteOneImageFile(fileUrl string) error
+	DeleteFile(fileUrl string) error
 	GetArchivePath(titleFile string, author string, fileUrl string) (string, string, error)
 }
 
@@ -155,7 +155,7 @@ func (r *LocalFileRepo) SaveImages(big_image *multipart.FileHeader, small_image 
 	return []string{image_small_url, image_big_url}, nil
 }
 
-func (r *LocalFileRepo) DeleteArchiveFile(gameId int) error {
+func (r *LocalFileRepo) DeleteGameFiles(gameId int) error {
 	gameId_str := strconv.Itoa(gameId)
 	folderPath := filepath.Join("uploads", "files", gameId_str)
 	if err := os.RemoveAll(folderPath); err != nil {
@@ -164,13 +164,13 @@ func (r *LocalFileRepo) DeleteArchiveFile(gameId int) error {
 	return nil
 }
 
-func (r *LocalFileRepo) DeleteOneImageFile(fileUrl string) error {
+func (r *LocalFileRepo) DeleteFile(fileUrl string) error {
 
 	fileUrl = strings.ReplaceAll(fileUrl, `\`, "/")
 
 	filePath := strings.Replace(fileUrl, "static", "uploads", 1)
 	if err := os.Remove(filePath); err != nil {
-		return errors.New("Ошибка удаления изображения")
+		return errors.New("Ошибка удаления файла")
 	}
 
 	return nil
