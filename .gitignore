@@ -7,3 +7,4 @@ uploads/
 *.exe
 .env
 test_web/
+test_files/

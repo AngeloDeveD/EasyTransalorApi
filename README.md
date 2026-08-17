@@ -1,38 +1,147 @@
-# Инструкция по запуску
+# EasyTranslator API
 
-### Локальный запуск (SQLite)
+Бэкенд-сервис для платформы игровых переводов и модификаций с асинхронным конвейером безопасности (Static Analysis, Bomb Guard, YARA, ClamAV Antivirus).
 
-1. Установить зависимости:
+---
+
+## 📋 Сетевая карта сервисов (Порты)
+
+| Сервис | Назначение | Порт внутри Docker | Внешний доступ (Хост) |
+| :--- | :--- | :--- | :--- |
+| **Go API** | Основной бэкенд и модерация | `:8080` | `http://localhost:8080` |
+| **Scanner** | Сервис анализа файлов (FastAPI) | `:8000` | `http://localhost:8000` *(в Dev-режиме)* |
+| **PostgreSQL** | База данных | `:5432` | `localhost:5432` |
+| **ClamAV** | Антивирусный демон | `:3310` | `clamav:3310` *(только внутренняя сеть)* |
+
+---
+
+## ⚡ Быстрый запуск (Скрипты управления)
+
+В проект встроены удобные скрипты с интерактивным меню и быстрыми командами:
+
+### Windows:
+* **Интерактивное меню:** запустите `run.bat`.
+* **Быстрые команды:**
+  ```cmd
+  run.bat dev    # Быстрый запуск DEV (без ClamAV, ~120 MB RAM)
+  run.bat full   # Полный боевой запуск PROD (с ClamAV, ~1 GB RAM)
+  run.bat stop   # Остановка контейнеров
+  run.bat reset  # Полный сброс базы данных
+  run.bat logs   # Просмотр логов в реальном времени
+  run.bat mod/moderator <userId> # Назначить роль модератора по userId
+  run.bat admin <userId> # Назначить админку по userId
+  ```
+
+### Linux / macOS:
+Перед первым использованием выдайте права на исполнение: `chmod +x run.sh`
+* **Интерактивное меню:** `./run.sh`
+* **Быстрые команды:**
+  ```bash
+  ./run.sh dev    # Быстрый запуск DEV (без ClamAV)
+  ./run.sh full   # Полный запуск PROD (с ClamAV)
+  ./run.sh stop   # Остановка
+  ./run.sh reset  # Полный сброс базы данных
+  ./run.sh logs   # Просмотр логов
+  ./run.sh mod/moderator <userId> # Назначить роль модератора по userId
+  ./run.sh admin <userId> # Назначить админку по userId
+  ```
+
+---
+
+## Ручной запуск через Docker Compose
+
+### 1. Режим быстрой разработки (DEV — без ClamAV)
+> Старт за 1.5 секунды, потребляет всего ~120 МБ RAM. Антивирус отключен, но работают проверки метаданных, защита от Zip-бомб и YARA.
+
 ```bash
-go mod tidy
-```
-2. Запустить сервер:
-```bash
-go run ./cmd/api/
+docker compose -f docker-compose.yml -f docker-compose.no-av.yml up -d --build
 ```
 
-### Назначение администратора
+### 2. Полный запуск (PROD — с проверками ClamAV)
+> Полная проверка сигнатур ClamAV (3.6+ млн баз). Требует ~1–1.2 GB RAM.
 
-Остановить сервер и выполнить команду (заменить `userId` на нужный):
 ```bash
-go run ./cmd/api/ --make-admin userId
+docker compose up -d --build
 ```
 
-### Запуск через Docker (PostgreSQL)
+### 3. Остановка сервисов
+```bash
+docker compose down
+```
 
-1. Собрать и запустить контейнеры:
+---
+
+## Политики безопасности и лимиты файлов
+
+* **Максимальный размер архива:** 5 GB.
+* **Максимальный распакованный объем:** 10 GB.
+* **Лимит на исполняемые файлы/скрипты (`.dll`, `.exe`, `.lua`, `.bat`):** строго до 100 MB *(защита от Binary Bloating)*.
+* **Защита от атак:** встроенная валидация Path Traversal (Zip Slip), отсечение POSIX Symlinks и проверка коэффициента сжатия (Zip Bomb Guard).
+* **Поддерживаемые архивы:** `.zip`, `.7z`, `.rar`.
+
+---
+
+## Тестирование сканера безопасности
+
+Для проверки работы конвейера и детекта тестовых сигнатур (EICAR):
+
 ```bash
-docker-compose up -d --build
+python scanner/test_scanner.py
 ```
-2. Остановка:
-```bash
-docker-compose down
-```
-3. Просмотр логов проверки файлов:
-```bash
-docker compose logs -f scanner
-```
-4. Назначение пользователя модератором(--make-moderator)/админом(--make-admin):
-```bash
-docker-compose exec api ./myapi --make-admin userId
+*(Скрипт автоматически создаст тестовые файлы и выведет статус проверки с интерактивным прогресс-баром в консоли).*
+
+---
+
+## Команды администрирования (CLI)
+
+Управление правами пользователей через консоль контейнера:
+
+* **Назначить администратора:**
+  ```bash
+  docker compose exec api ./myapi --make-admin <userID>
+  ```
+* **Назначить модератора:**
+  ```bash
+  docker compose exec api ./myapi --make-moderator <userID>
+  ```
+
+---
+
+## Управление базой данных и очистка
+
+* **Просмотр логов антивирусного сканера:**
+  ```bash
+  docker compose logs -f scanner
+  ```
+* **Просмотр логов основного API:**
+  ```bash
+  docker compose logs -f api
+  ```
+* **Полная очистка базы данных PostgreSQL:**
+  ```bash
+  docker compose down -v
+  ```
+
+---
+
+## Переменные окружения (`.env`)
+
+Создайте файл `.env` в корне проекта при необходимости переопределить стандартные значения:
+
+```ini
+# База данных PostgreSQL
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=secret
+POSTGRES_DB=translations_db
+
+# Безопасность и авторизация
+JWT_SECRET=super_duper_secret_prod_key_998
+INTERNAL_KEY=super_secret_cloud_key_998
+
+# Конфигурация ClamAV
+CLAMD_HOST=clamav
+CLAMD_PORT=3310
+
+# Настройки Webhook
+MAIN_API_URL=http://api:8080/api/internal/scan-result
 ```

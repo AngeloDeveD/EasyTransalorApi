@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # 1. Отключаем контейнер ClamAV (0 копий)
+  clamav:
+    deploy:
+      replicas: 0
+
+  # 2. Передаем сканеру, что ClamAV отключен, и сбрасываем ожидание его запуска
+  scanner:
+    environment:
+      - CLAMD_ENABLED=false
+    depends_on:
+      clamav: !reset null # Не ждем запуска ClamAV
+    ports:
+      - "8000:8000"       # Открываем сканер наружу для удобства тестов
+
+  # 3. Открываем порты базы для удобной разработки
+  db:
+    ports:
+      - "5432:5432"
+
+  # 4. Включаем дебаг-логи для Go API
+  api:
+    environment:
+      - APP_ENV=development
+      - GIN_MODE=debug

@@ -39,7 +39,7 @@ func (r *LocalFileRepo) IsAllowedArchiveFormat(file *multipart.FileHeader) error
 	allowFileExts := map[string]bool{".zip": true, ".7zip": true, ".rar": true}
 	ext := strings.ToLower(filepath.Ext(file.Filename))
 	if !allowFileExts[ext] {
-		return errors.New("неподдерживаемый формат файла!")
+		return errors.New("Неподдерживаемый формат файла!")
 	}
 	return nil
 }

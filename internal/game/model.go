@@ -27,7 +27,7 @@ type TranslateCard struct {
 	PercentReady  float64   `json:"percentReady"`
 	UrlToDownload string    `json:"urlToDownload"`
 	FileSize      float64   `json:"fileSize"`
-	Status        string    `json:"status" gorm:"default:pending"` //pending, approved, rejected
+	Status        string    `json:"status" gorm:"default:pending"` //pending, approved, rejected, error
 	ScanDetails   string    `json:"scanDetails" gorm:"default:''"`
 	GameInfoID    int       `json:"-"`
 	CreatedAt     time.Time `json:"createdAt"`

@@ -1,21 +1,45 @@
 import yara
-from pathlib import Path
-from functools import lru_cache
+from typing import List, Optional
 
-from config import settings
+# Правила для детекта подозрительных инжекций и дропперов
+YARA_RULES_SRC = """
+rule Suspicious_Process_Injection {
+    meta:
+        description = "Detects WinAPI used for DLL Injection and Memory Patching"
+    strings:
+        $api1 = "VirtualAllocEx" ascii wide
+        $api2 = "WriteProcessMemory" ascii wide
+        $api3 = "CreateRemoteThread" ascii wide
+        $api4 = "SetWindowsHookEx" ascii wide
+    condition:
+        2 of ($api*)
+}
 
-EXEC_EXT = {".exe", ".dll", ".sys", ".scr"}
+rule Suspicious_Script_Download {
+    meta:
+        description = "Detects PowerShell / Web Client download commands in scripts"
+    strings:
+        $p1 = "DownloadString" ascii wide nocase
+        $p2 = "powershell -enc" ascii wide nocase
+        $p3 = "IEX" ascii wide nocase
+    condition:
+        any of them
+}
+"""
 
-@lru_cache(maxsize=1)
-def _compiled_rulse():
-    filepaths = {}
-    for i, p in enumerate(sorted(Path(settings.YARA_RULES_DIR).glob("*.yar"))):
-        filepaths[f"ns{i}"] = str(p)
-    return yara.compile(filepaths=filepaths) if filepaths else None
+class YaraScanner:
+    def __init__(self):
+        try:
+            self.rules = yara.compile(source=YARA_RULES_SRC)
+        except Exception as e:
+            self.rules = None
+            print(f"Warning: Failed to compile YARA rules: {e}")
 
-def yara_scan(path: Path) -> list[str]:
-    rules = _compiled_rulse()
-    if rules is None:
-        return []
-    matches = rules.match(filepath=str(path))
-    return [m.rule for m in matches]
+    def scan_file(self, file_path: str) -> List[str]:
+        if not self.rules:
+            return []
+        try:
+            matches = self.rules.match(file_path)
+            return [m.rule for m in matches]
+        except Exception:
+            return []

@@ -11,13 +11,13 @@ func SetupGameRoutes(router *gin.Engine, handler *GameHandler, authHandler gin.H
 		public.GET("/cards", handler.GetCards)
 		public.GET("/games", handler.GetGames)
 		public.GET("/games/:gameid", handler.GetGameById)
+		public.GET("/download/:gameid/:translid", handler.DownloadGameTranslation)
 	}
 
 	private := router.Group("", authHandler)
 	{
 		private.POST("/games/add", handler.AddGame)
 		private.POST("games/translate/:gameid", handler.AddTranslationInfo)
-		private.GET("/download/:gameid/:translid", handler.DownloadGameTranslation)
 	}
 
 	adminOnly := router.Group("", authHandler, adminHandler)

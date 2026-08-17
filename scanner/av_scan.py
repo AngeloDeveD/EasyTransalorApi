@@ -1,46 +1,42 @@
-import clamd, asyncio, logging
-from pathlib import Path
+import socket
+import struct
+from typing import Tuple, Optional
+from config import Config
 
-from config import settings
+class ClamAVScanner:
+    @staticmethod
+    def _send_instream(sock: socket.socket, file_path: str) -> None:
+        """Потоковая отправка файла в clamd через команду INSTREAM."""
+        sock.sendall(b"zINSTREAM\0")
+        with open(file_path, "rb") as f:
+            while chunk := f.read(Config.CHUNK_SIZE):
+                size = struct.pack("!I", len(chunk))
+                sock.sendall(size + chunk)
+        # Завершающий чанк размером 0
+        sock.sendall(struct.pack("!I", 0))
 
-
-class ScannerUnavailableError(Exception):
-    """Движок ClamAV не смог просканировать файл (сокет закрыт, демон недоступен).
-
-    Это НЕ вердикт «заражён» — это отказ движка. Пайплайн уводит такой файл
-    на ручную проверку, а не отклоняет: иначе легитимный файл ложно попадёт
-    в rejected_by_scanner (как было при Broken pipe на крупных файлах).
-    """
-
-
-# TCP, когда сканер и clamd — разные контейнеры; unix-сокет для локального демона.
-if settings.CLAMD_HOST:
-    _cd = clamd.ClamdNetworkSocket(settings.CLAMD_HOST, settings.CLAMD_PORT)
-else:
-    _cd = clamd.ClamdUnixSocket(settings.CLAMD_SOCKET)
-
-async def clamav_scan(path: Path) -> tuple[bool, str]:
-    """Возвращает (clean, description).
-
-    Бросает ScannerUnavailableError, если демон закрыл соединение или недоступен
-    (BrokenPipeError / clamd.ConnectionError). Вызывающий код обязан отличать
-    этот отказ движка от честного вердикта FOUND.
-    """
-
-    logger = logging.getLogger("uvicorn.error")
-    
-    loop = asyncio.get_running_loop()
-    def _scan():
-        #instream стримит файл в clamd, не требует доступа демона в пути
+    @classmethod
+    def scan_file(cls, file_path: str) -> Tuple[bool, Optional[str]]:
+        """
+        Возвращает (is_clean, threat_name).
+        is_clean = True (чисто), False (найдена угроза).
+        """
         try:
-            with open(path, "rb") as f:
-                res = _cd.instream(f)
-        except (BrokenPipeError, clamd.ConnectionError, ConnectionError) as e:
-            # Демон оборвал INSTREAM (например, файл превысил StreamMaxLength)
-            # либо вообще недоступен — это отказ движка, а не «заражён».
-            logger.error(f"ClamAV scan failed for {path.name}: {e}")
-            raise ScannerUnavailableError(f"clamd недоступен: {e}") from e
-        #res: {'stream': ('OK', None)} | {'stream': ('FOUND', 'Eicar-...')}
-        status, desc = res.get("stream", ("ERROR", "no response"))
-        return status == "OK", desc or ""
-    return await loop.run_in_executor(None, _scan)
+            with socket.create_connection(
+                (Config.CLAMAV_HOST, Config.CLAMAV_PORT), 
+                timeout=Config.CLAMAV_TIMEOUT
+            ) as sock:
+                cls._send_instream(sock, file_path)
+                response = sock.recv(4096).decode("utf-8", errors="ignore").strip()
+
+                if "FOUND" in response:
+                    # Пример ответа: 'stream: Win.Test.EICAR_HDB-1 FOUND'
+                    threat_name = response.split("FOUND")[0].replace("stream:", "").strip()
+                    return False, threat_name
+                elif "OK" in response:
+                    return True, None
+                else:
+                    raise RuntimeError(f"ClamAV error response: {response}")
+        except Exception as e:
+            # При недоступности антивируса — безопасный отказ
+            raise RuntimeError(f"Ошибка соединения с ClamAV: {e}")

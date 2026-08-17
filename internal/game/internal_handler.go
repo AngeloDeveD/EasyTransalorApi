@@ -49,8 +49,8 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 		return
 	}
 
-	if req.Status == "rejected_by_scanner" {
-
+	switch req.Status {
+	case "rejected":
 		//Проверка на статус самого http
 		if c.Writer.Status() != http.StatusAccepted {
 			err := fmt.Sprintf("Ошибка: %s", req.Details)
@@ -92,7 +92,7 @@ func (h *InternalHandler) ReceiveScanResult(c *gin.Context) {
 				_ = os.Remove(filePath) // Удаляем файл, ошибку игнорируем (если файла уже нет)
 			}
 		}
-	} else if req.Status == "pending_sandbox" {
+	case "error":
 		translation, err := h.GameRepo.GetTranslationByID(req.TransID)
 		if err == nil {
 			//Отправка уведомления

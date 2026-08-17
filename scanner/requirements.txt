@@ -6,3 +6,4 @@ clamd
 yara-python
 rarfile
 py7zr
+python-multipart
