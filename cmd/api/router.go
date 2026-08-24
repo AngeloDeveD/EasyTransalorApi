@@ -98,6 +98,10 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	})
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+	r.GET("/api/tos", func(c *gin.Context) {
+		c.JSON(http.StatusTeapot, gin.H{"message": "Пока ничего нету. Я - пакетик"})
+	})
+
 	// Healthcheck
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "API работает!"})
