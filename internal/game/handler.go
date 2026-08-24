@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"strings"
 	"time"
 
 	"net/http"
@@ -19,6 +18,9 @@ import (
 // ScanTrigger отправляет загруженный архив на антивирусную проверку.
 // Интерфейс держим в пакете game, чтобы не завязываться на пакет scanner
 // напрямую (и легко подменять заглушкой в тестах).
+const maxTranslationUploadBodyBytes = 5<<30 + 10<<20
+const maxGameImageUploadBodyBytes = 12 << 20
+
 type ScanTrigger interface {
 	Scan(transID int, fileURL string)
 }
@@ -42,35 +44,26 @@ type PublicTranslationSummary struct {
 	DownloadUrl  string    `json:"downloadUrl"`
 }
 
-type ArchiveHashCheckRequest struct {
-	ArchiveHash string `json:"archiveHash" binding:"required"`
+func toPublicGameInfo(game GameInfo) PublicGameInfo {
+	translations := make([]PublicTranslationSummary, 0, len(game.TranslateCards))
+	for _, card := range game.TranslateCards {
+		if card.Status != "approved" {
+			continue
+		}
+		translations = append(translations, PublicTranslationSummary{
+			ID:           card.ID,
+			AuthorName:   card.AuthorName,
+			Source:       card.Source,
+			Version:      card.Version,
+			PercentReady: card.PercentReady,
+			FileSize:     card.FileSize,
+			CreatedAt:    card.CreatedAt,
+			DownloadUrl:  "/download/" + strconv.Itoa(card.ID),
+		})
+	}
+	return PublicGameInfo{ID: game.ID, Title: game.Title, IconUrl: game.IconUrl, Translations: translations}
 }
 
-type TranslationStatusResponse struct {
-	ID          int              `json:"id"`
-	Status      string           `json:"status"`
-	ScanDetails string           `json:"scanDetails"`
-	Files       []PublicGameFile `json:"files"`
-}
-
-type MyTranslationResponse struct {
-	ID           int       `json:"id"`
-	GameInfoID   int       `json:"gameInfoId"`
-	AuthorName   string    `json:"authorName"`
-	Source       string    `json:"source"`
-	Version      float64   `json:"version"`
-	PercentReady float64   `json:"percentReady"`
-	FileSize     float64   `json:"fileSize"`
-	Status       string    `json:"status"`
-	ScanDetails  string    `json:"scanDetails"`
-	CreatedAt    time.Time `json:"createdAt"`
-	DownloadUrl  string    `json:"downloadUrl,omitempty"`
-}
-
-type PublicGameFile struct {
-	FileName string `json:"fileName"`
-	Size     string `json:"size"`
-}
 type GameHandler struct {
 	Repo     GameRepository
 	FileRepo files.FileRepository
@@ -194,7 +187,6 @@ func (h *GameHandler) GetGames(c *gin.Context) {
 	for _, game := range games {
 		publicGames = append(publicGames, toPublicGameInfo(game))
 	}
-
 	c.JSON(http.StatusAccepted, publicGames)
 }
 
@@ -262,7 +254,7 @@ func (h *GameHandler) DownloadGameTranslation(c *gin.Context) {
 
 	if card.Status != "approved" {
 		role, exist := c.Get("role")
-		if !exist || role != "moderation" && role != "admin" {
+		if !exist || role != "moderator" && role != "admin" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ закрыт. Файл находится на модерации."})
 			return
 		}
@@ -405,6 +397,8 @@ func (h *GameHandler) DeleteMyTranslation(c *gin.Context) {
 //POST /games/add
 /*Добавление карточки игры*/
 func (h *GameHandler) AddGame(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxGameImageUploadBodyBytes)
+
 	//Привязка текстовых данных из форм
 	var req CreateGameRequest
 
@@ -427,6 +421,12 @@ func (h *GameHandler) AddGame(c *gin.Context) {
 		return
 	}
 
+	//Проверка размера изображений
+	if err := h.FileRepo.IsAllowedImageSize(small_pic.Size, big_pic.Size); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	//Проверка на поддерживаемые форматы
 	if err := h.FileRepo.IsAllowedImageFormat(big_pic); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -437,13 +437,6 @@ func (h *GameHandler) AddGame(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	//Проверка размера изображений
-	if err := h.FileRepo.IsAllowedImageSize(small_pic.Size, big_pic.Size); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
 	//Сохранения картинок
 	image_url, err := h.FileRepo.SaveImages(big_pic, small_pic)
 
@@ -494,6 +487,8 @@ func (h *GameHandler) AddGame(c *gin.Context) {
 //POST /games/translate/:gameid
 /*Добавляет архив с переводом к игре*/
 func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxTranslationUploadBodyBytes)
+
 	var req CreateTraslateRequest
 
 	userID, exist := c.Get("userID")
@@ -566,7 +561,6 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "Такой архив перевода уже был загружен"})
 		return
 	}
-
 	//Сначала узнаём размер файла в мегабайтах, а потом округляем до одного символа пары символов после точки
 	sizeInMb := float64(file.Size) / (1024 * 1024)
 	roundedSize := math.Round(sizeInMb*100) / 100
@@ -588,6 +582,7 @@ func (h *GameHandler) AddTranslationInfo(c *gin.Context) {
 	saveTranslationInfo := h.Repo.AddTranslation(gameid, trasnalteInfo)
 
 	if saveTranslationInfo != nil {
+		_ = h.FileRepo.DeleteFile(file_url)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": saveTranslationInfo.Error()})
 		return
 	}

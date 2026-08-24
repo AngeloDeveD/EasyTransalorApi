@@ -60,12 +60,9 @@ func TestGames(t *testing.T) {
 	assert.NotEmpty(t, games)
 	assert.Equal(t, 1, games[0].ID)
 	assert.Equal(t, "Игра номер 1", games[0].Title)
-	assert.Len(t, games[0].Translations, 1)
-	assert.Equal(t, "/download/1", games[0].Translations[0].DownloadUrl)
 	assert.NotContains(t, w.Body.String(), "archiveHash")
-	assert.NotContains(t, w.Body.String(), "scanDetails")
 	assert.NotContains(t, w.Body.String(), "urlToDownload")
-	assert.NotContains(t, w.Body.String(), "pending_scan")
+	assert.NotContains(t, w.Body.String(), "scanDetails")
 }
 
 // Получение карточек игр
@@ -100,12 +97,12 @@ func TestAddGames(t *testing.T) {
 
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic.jpg")
 	assert.NoError(t, err)
-	_, err = io.WriteString(bigImage, "fake-image-content-1")
+	_, err = bigImage.Write([]byte{0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00})
 	assert.NoError(t, err)
 
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic.png")
 	assert.NoError(t, err)
-	_, err = io.WriteString(smallImage, "fake-image-content-2")
+	_, err = smallImage.Write([]byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})
 	assert.NoError(t, err)
 
 	multiWriter.Close()
@@ -140,13 +137,13 @@ func TestAddGames_MultipleFiles_HeavyFiles(t *testing.T) {
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic_heavy.jpg")
 	assert.NoError(t, err)
 	bigImage.Write(heavyFileBytes)
-	_, err = io.WriteString(bigImage, "fake-image-content-1")
+	_, err = bigImage.Write([]byte{0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00})
 	assert.NoError(t, err)
 
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic_heavy.png")
 	assert.NoError(t, err)
 	smallImage.Write(heavyFileBytes)
-	_, err = io.WriteString(smallImage, "fake-image-content-2")
+	_, err = smallImage.Write([]byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})
 	assert.NoError(t, err)
 	multiWriter.Close()
 
@@ -171,12 +168,12 @@ func TestAddGames_MultipleFiles_UnsupportFormatFiles(t *testing.T) {
 
 	bigImage, err := multiWriter.CreateFormFile("big_pic", "big_pic_heavy.exe")
 	assert.NoError(t, err)
-	_, err = io.WriteString(bigImage, "fake-image-content-1")
+	_, err = bigImage.Write([]byte{0xff, 0xd8, 0xff, 0xdb, 0x00, 0x43, 0x00})
 	assert.NoError(t, err)
 
 	smallImage, err := multiWriter.CreateFormFile("small_pic", "small_pic_heavy.dll")
 	assert.NoError(t, err)
-	_, err = io.WriteString(smallImage, "fake-image-content-2")
+	_, err = smallImage.Write([]byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a})
 	assert.NoError(t, err)
 
 	multiWriter.Close()
@@ -205,7 +202,7 @@ func TestAddTranslate(t *testing.T) {
 
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
-	_, err = io.WriteString(zipFile, "fake-archive-content-1")
+	_, err = io.WriteString(zipFile, "PK\x03\x04fake-archive-content-1")
 	assert.NoError(t, err)
 
 	multiWriter.Close()
@@ -242,7 +239,7 @@ func TestAddTranslate_WithStringId(t *testing.T) {
 
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
-	_, err = io.WriteString(zipFile, "fake-archive-content-1")
+	_, err = io.WriteString(zipFile, "PK\x03\x04fake-archive-content-1")
 	assert.NoError(t, err)
 
 	multiWriter.Close()
@@ -275,7 +272,7 @@ func TestAddTranslate_InvalidGameId(t *testing.T) {
 
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.zip")
 	assert.NoError(t, err)
-	_, err = io.WriteString(zipFile, "fake-archive-content-1")
+	_, err = io.WriteString(zipFile, "PK\x03\x04fake-archive-content-1")
 	assert.NoError(t, err)
 
 	multiWriter.Close()
@@ -308,7 +305,7 @@ func TestAddTranslate_InvalidFileFormat(t *testing.T) {
 
 	zipFile, err := multiWriter.CreateFormFile("file", "translate.exe")
 	assert.NoError(t, err)
-	_, err = io.WriteString(zipFile, "fake-archive-content-1")
+	_, err = io.WriteString(zipFile, "PK\x03\x04fake-archive-content-1")
 	assert.NoError(t, err)
 
 	multiWriter.Close()

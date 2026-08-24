@@ -33,6 +33,15 @@ func (h *ModerationHandler) recordAudit(c *gin.Context, action string, targetID 
 	}
 }
 
+func isAllowedModerationStatus(status string) bool {
+	switch status {
+	case "pending_scan", "approved", "rejected", "error":
+		return true
+	default:
+		return false
+	}
+}
+
 // GET /api/admin/moderation?page=1
 func (h *ModerationHandler) GetQueue(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -71,8 +80,8 @@ func (h *ModerationHandler) ChangeStatus(c *gin.Context) {
 
 	status := c.Param("status")
 
-	if status == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Статус не найден!"})
+	if !isAllowedModerationStatus(status) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Недопустимый статус"})
 		return
 	}
 

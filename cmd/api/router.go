@@ -52,6 +52,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// --- Настройка маршрутов ---
 
+	checkedAuthMiddleware := auth.AuthMiddlewareWithUserCheck(jwtManager, authRepo)
+
 	// Авторизация
 	autoHandler := auth.NewAuthHandler(authRepo, jwtManager)
 	auth.SetupAuthRoutes(r, autoHandler, limiter.Middleware(ratelimit.Config{
@@ -62,15 +64,15 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// Уведомления
 	notifHandler := notification.NewNotificationHandler(notifRepo)
-	notification.SetupNotificationRoutes(r, notifHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware())
+	notification.SetupNotificationRoutes(r, notifHandler, checkedAuthMiddleware, auth.ModeratorMiddleware())
 
 	// Админка
-	adminHandler := auth.NewAdminHandler(authRepo, notifRepo, auditRepo)
-	auth.SetupAdminRoutes(r, adminHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware(), auth.AdminMiddleware())
+	adminHandler := auth.NewAdminHandler(authRepo, notifRepo)
+	auth.SetupAdminRoutes(r, adminHandler, checkedAuthMiddleware, auth.ModeratorMiddleware(), auth.AdminMiddleware())
 
 	// Игры
 	gameHandler := game.NewGameHandler(gameRepo, fileRepo, scannerClient)
-	game.SetupGameRoutes(r, gameHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware(), limiter.Middleware(ratelimit.Config{
+	game.SetupGameRoutes(r, gameHandler, checkedAuthMiddleware, auth.ModeratorMiddleware(), limiter.Middleware(ratelimit.Config{
 		Enabled:  cfg.RateLimitEnabled,
 		Requests: cfg.RateLimitWriteRequests,
 		Window:   cfg.RateLimitWriteWindow,
@@ -78,12 +80,12 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 
 	// Чат
 	chatHub := chat.NewHub()
-	chatHandler := chat.NewChatHandler(chatHub, chatRepo, []byte(cfg.EncryptKey))
-	chat.SetupChatRoutes(r, chatHandler, auth.AuthMiddleware(jwtManager))
+	chatHandler := chat.NewChatHandler(chatHub, chatRepo, []byte(cfg.EncryptKey), cfg.CORSAllowedOrigins)
+	chat.SetupChatRoutes(r, chatHandler, checkedAuthMiddleware)
 
 	// Модерация
-	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo, auditRepo)
-	game.SetupModerationRoutes(r, moderationHandler, auth.AuthMiddleware(jwtManager), auth.ModeratorMiddleware())
+	moderationHandler := game.NewModerationHandler(gameRepo, authRepo, notifRepo)
+	game.SetupModerationRoutes(r, moderationHandler, checkedAuthMiddleware, auth.ModeratorMiddleware())
 
 	// Внутренние роуты (для Python-сканера)
 	internalHandler := game.NewInternalHandler(gameRepo, authRepo, fileRepo, notifRepo)
@@ -101,8 +103,8 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	})
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	r.GET("/api/tos", func(c *gin.Context) {
+		c.JSON(http.StatusTeapot, gin.H{"message": "Пока ничего нету. Я - пакетик"})
 	})
 
 	// Healthcheck

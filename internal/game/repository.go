@@ -140,6 +140,17 @@ func (r *SqliteGameRepo) CreateNewGame(newGameCard GameCard, newGameInfo GameInf
 	return tx.Commit().Error
 }
 
+func (r *SqliteGameRepo) ArchiveHashExists(hash string) (bool, error) {
+	if hash == "" {
+		return false, nil
+	}
+
+	var count int64
+	if err := r.db.Model(&TranslateCard{}).Where("archive_hash = ?", hash).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
 func (r *SqliteGameRepo) CheckCreatedGame(gameId int) error {
 	var gameInfo GameInfo
 	if err := r.db.First(&gameInfo, gameId).Error; err != nil {
@@ -259,7 +270,7 @@ func (r *SqliteGameRepo) ApproveTranslation(translationId int) error {
 }
 
 func (r *SqliteGameRepo) RejectTranslation(translationId int) error {
-	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", "reject")
+	result := r.db.Model(&TranslateCard{}).Where("id = ?", translationId).Update("status", "rejected")
 	if result.RowsAffected == 0 {
 		return errors.New("Перевод не найден")
 	}
@@ -345,6 +356,16 @@ func (r *InMemoryGameRepo) CreateNewGame(newGameCard GameCard, newGameInfo GameI
 	return nil
 }
 
+func (r *InMemoryGameRepo) ArchiveHashExists(hash string) (bool, error) {
+	for _, game := range r.gameInfo {
+		for _, card := range game.TranslateCards {
+			if card.ArchiveHash == hash {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
 func (r *InMemoryGameRepo) CheckCreatedGame(gameId int) error {
 	found := false
 

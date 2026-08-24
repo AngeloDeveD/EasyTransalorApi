@@ -20,3 +20,5 @@ uploads/
 .git/
 __pycache__/
 test_files/
+
+showDirectory.py

@@ -58,6 +58,8 @@ def save_directory_tree(root_dir, output_filename="directory_tree.txt"):
 # ИСПОЛЬЗОВАНИЕ
 # ================================
 # Укажи здесь путь к папке, которую хочешь сохранить
-target_folder = "."  # Точка означает текущую папку, можешь заменить на "C:/МояПапка"
+#target_folder = "."  # Точка означает текущую папку, можешь заменить на "C:/МояПапка"
+
+target_folder = Path(__file__).resolve().parent.name
 
 save_directory_tree(target_folder)

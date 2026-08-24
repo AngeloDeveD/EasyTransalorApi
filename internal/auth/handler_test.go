@@ -82,7 +82,6 @@ func (r *InMemoryUserRepo) UpdateLastLoginInfo(id int, ip string) error {
 	}
 	return errors.New("не найден")
 }
-
 func (r *InMemoryUserRepo) BlockUser(id int) error {
 	for i := range r.users {
 		if r.users[i].ID == id {
