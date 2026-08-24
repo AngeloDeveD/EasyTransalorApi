@@ -136,7 +136,7 @@ func TestGetArchivePath_Valid(t *testing.T) {
 	path, filename, err := repo.GetArchivePath("Моя Игра", "Автор Крутой", "/static/files/1/abc.zip")
 	assert.NoError(t, err)
 	// URL превращается в путь на диске
-	assert.Equal(t, "uploads/files/1/abc.zip", path)
+	assert.Equal(t, filepath.FromSlash("uploads/files/1/abc.zip"), path)
 	// пробелы и + в имени заменяются на _
 	assert.Equal(t, "Моя_Игра_Автор_Крутой.zip", filename)
 }
@@ -184,4 +184,15 @@ func TestSaveImages_RoundTrip(t *testing.T) {
 	// [0] — маленькая иконка, [1] — большая
 	assert.True(t, strings.Contains(urls[0], "static/Icons/Small/"), urls[0])
 	assert.True(t, strings.Contains(urls[1], "static/Icons/Big/"), urls[1])
+}
+
+func TestCalculateSHA256(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "archive.zip")
+	require.NoError(t, os.WriteFile(path, []byte("same-archive-content"), 0644))
+
+	hash, err := CalculateSHA256(path)
+	require.NoError(t, err)
+
+	assert.Equal(t, "374f6b4866b189bdee9c967546171c904e94013bc24dea9b8889943449d2762b", hash)
 }

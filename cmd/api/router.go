@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "myapi/docs"
+	"myapi/internal/audit"
 	"myapi/internal/auth"
 	"myapi/internal/chat"
 	"myapi/internal/config"
@@ -19,7 +20,10 @@ import (
 )
 
 func setupRouter(cfg *config.Config) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(requestIDMiddleware())
+	r.Use(requestLoggerMiddleware())
+	r.Use(recoveryLoggerMiddleware())
 	r.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 
 	limiter := ratelimit.NewMemoryLimiter()
@@ -35,6 +39,7 @@ func setupRouter(cfg *config.Config) *gin.Engine {
 	}
 
 	// --- Инициализация репозиториев ---
+	auditRepo := audit.NewSqlRepository(db)
 	authRepo := auth.NewSqlUserRepo(db)
 	notifRepo := notification.NewSqlNotificationRepo(db)
 	fileRepo := files.NewLocalFileRepo()

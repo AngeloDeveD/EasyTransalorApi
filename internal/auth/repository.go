@@ -12,6 +12,7 @@ type UserRepository interface {
 	GetUserByNickname(nickname string) (*User, error)
 	GetUserById(id int) (*User, error)
 	GetUsers(limit int, offset int) ([]User, int64, error)
+	UpdateLastLoginInfo(id int, ip string) error
 	BlockUser(id int) error
 	UnblockUser(id int) error
 	WarnUser(id int, reason string) error

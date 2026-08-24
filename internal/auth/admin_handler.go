@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"log/slog"
+	"myapi/internal/audit"
 	"myapi/internal/notification"
 	"net/http"
 	"strconv"
@@ -11,10 +13,21 @@ import (
 type AdminHandler struct {
 	Repo      UserRepository
 	NotifRepo notification.NotificationRepository
+	AuditRepo audit.Repository
 }
 
-func NewAdminHandler(repo UserRepository, notifRepo notification.NotificationRepository) *AdminHandler {
-	return &AdminHandler{Repo: repo, NotifRepo: notifRepo}
+func NewAdminHandler(repo UserRepository, notifRepo notification.NotificationRepository, auditRepos ...audit.Repository) *AdminHandler {
+	auditRepo := audit.Repository(audit.NoopRepository{})
+	if len(auditRepos) > 0 && auditRepos[0] != nil {
+		auditRepo = auditRepos[0]
+	}
+	return &AdminHandler{Repo: repo, NotifRepo: notifRepo, AuditRepo: auditRepo}
+}
+
+func (h *AdminHandler) recordAudit(c *gin.Context, action string, targetID int, details string) {
+	if err := h.AuditRepo.Create(audit.NewEventFromContext(c, action, audit.TargetUser, targetID, details)); err != nil {
+		slog.ErrorContext(c.Request.Context(), "audit log failed", slog.String("action", action), slog.Int("target_id", targetID), slog.Any("error", err))
+	}
 }
 
 // Структура для принятия варна
@@ -60,6 +73,36 @@ func (h *AdminHandler) GetUsers(c *gin.Context) {
 	})
 }
 
+func (h *AdminHandler) GetAuditEvents(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	limitStr := c.DefaultQuery("limit", "50")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 50
+	}
+
+	offset := (page - 1) * limit
+	events, totalCount, err := h.AuditRepo.List(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения audit logs"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":       events,
+		"total":      totalCount,
+		"page":       page,
+		"limit":      limit,
+		"totalPages": (totalCount + int64(limit) - 1) / int64(limit),
+	})
+}
+
 //PATCH /api/admin/users/:userid/block
 /*Блокирует пользователя*/
 func (h *AdminHandler) BlockUser(c *gin.Context) {
@@ -74,6 +117,7 @@ func (h *AdminHandler) BlockUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	h.recordAudit(c, "user.block", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Пользователь заблокирован"})
 }
 
@@ -91,6 +135,7 @@ func (h *AdminHandler) UnblockUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	h.recordAudit(c, "user.unblock", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Пользователь разблокирован"})
 }
 
@@ -122,11 +167,13 @@ func (h *AdminHandler) WarnUser(c *gin.Context) {
 		Message: "Причина: " + req.Reason,
 	}
 	h.NotifRepo.Create(notif)
+	h.recordAudit(c, "user.warn", id, req.Reason)
 
 	//проверка кол-ва варнов. Если больше трёх - бан
 	user, err := h.Repo.GetUserById(id)
 	if err == nil && user.WarnCount >= 3 {
 		h.Repo.BlockUser(id)
+		h.recordAudit(c, "user.auto_block_after_warnings", id, req.Reason)
 
 		//Уведомление пользователя о блокировке
 		banNotif := &notification.Notification{
@@ -157,6 +204,7 @@ func (h *AdminHandler) UnwarnUser(c *gin.Context) {
 		return
 	}
 
+	h.recordAudit(c, "user.unwarn", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Последний варн снят"})
 }
 
@@ -189,6 +237,7 @@ func (h *AdminHandler) SetRole(c *gin.Context) {
 		Message: "Администратор назначил вам роль: " + req.Role,
 	}
 	h.NotifRepo.Create(notif)
+	h.recordAudit(c, "user.set_role", id, req.Role)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Роль пользователя обновлена"})
 }

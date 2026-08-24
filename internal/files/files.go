@@ -226,10 +226,7 @@ func (r *LocalFileRepo) DeleteGameFiles(gameId int) error {
 }
 
 func (r *LocalFileRepo) DeleteFile(fileUrl string) error {
-
-	fileUrl = strings.ReplaceAll(fileUrl, `\`, "/")
-
-	filePath := strings.Replace(fileUrl, "static", "uploads", 1)
+	filePath := StaticURLToPath(fileUrl)
 	if err := os.Remove(filePath); err != nil {
 		return errors.New("Ошибка удаления файла")
 	}
@@ -238,8 +235,8 @@ func (r *LocalFileRepo) DeleteFile(fileUrl string) error {
 }
 
 func (r *LocalFileRepo) DeleteImageFiles(big_img_url string) error {
-	filePathBig := strings.Replace(big_img_url, "/static/", "uploads/", 1)
-	filePathSmall := strings.Replace(filePathBig, "/Big/", "/Small/", 1)
+	filePathBig := StaticURLToPath(big_img_url)
+	filePathSmall := strings.Replace(filePathBig, string(filepath.Separator)+"Big"+string(filepath.Separator), string(filepath.Separator)+"Small"+string(filepath.Separator), 1)
 
 	if err := os.Remove(filePathBig); err != nil {
 		return errors.New("ошибка удаления большого изображения")
@@ -258,7 +255,7 @@ func (r *LocalFileRepo) GetArchivePath(titleFile string, author string, fileUrl 
 	}
 
 	// 1. Превращаем URL в реальный путь на диске
-	filePath := strings.Replace(fileUrl, "/static/", "uploads/", 1)
+	filePath := StaticURLToPath(fileUrl)
 
 	// 2. Формируем красивое имя для скачивания
 	rawName := titleFile + "_" + author + filepath.Ext(fileUrl)

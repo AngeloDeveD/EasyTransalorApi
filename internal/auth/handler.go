@@ -30,11 +30,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user := &User{
-		FirstName:    req.FirstName,
-		SecondName:   req.LastName,
-		Nickname:     req.Nickname,
-		PasswordHash: string(hashedPassword),
-		Role:         "author",
+		FirstName:      req.FirstName,
+		SecondName:     req.LastName,
+		Nickname:       req.Nickname,
+		PasswordHash:   string(hashedPassword),
+		Role:           "author",
+		RegistrationIP: c.ClientIP(),
+		LastLoginIP:    c.ClientIP(),
 	}
 
 	if err := h.Repo.CreateUser(user); err != nil {

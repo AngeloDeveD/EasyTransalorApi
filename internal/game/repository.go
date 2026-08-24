@@ -12,6 +12,7 @@ type GameRepository interface {
 	GetAllCards() ([]GameCard, error)
 	GetAllGamesInfo() ([]GameInfo, error)
 	GetTranslationByID(id int) (TranslateCard, error)
+	GetTranslationsByAuthorID(authorID int) ([]TranslateCard, error)
 	CreateNewGame(GameCard, GameInfo) error
 	AddTranslation(int, TranslateCard) error
 	ArchiveHashExists(hash string) (bool, error)
@@ -53,27 +54,31 @@ func NewInMemoryGameRepo() *InMemoryGameRepo {
 					{
 						ID:            1,
 						AuthorName:    "Васька 1",
+						AuthorId:      1,
 						Source:        "url",
 						Version:       1.0,
-						PercentReady:  0.0,
-						UrlToDownload: "url",
-						FileSize:      0.0,
+						PercentReady:  100.0,
+						UrlToDownload: "/static/files/1/approved.zip",
+						ArchiveHash:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						FileSize:      1.25,
+						Status:        "approved",
+						GameInfoID:    1,
+						GameFiles: []DetailedGameFiles{
+							{FileName: "translation/dialogue.json", Hash: "internal-file-hash", Size: "1.00 Kb"},
+						},
 					},
-				},
-			},
-			{
-				ID:      1,
-				Title:   "Игра номер 1",
-				IconUrl: "Url1",
-				TranslateCards: []TranslateCard{
 					{
-						ID:            1,
-						AuthorName:    "Васька 1",
+						ID:            2,
+						AuthorName:    "Васька 2",
+						AuthorId:      1,
 						Source:        "url",
-						Version:       1.0,
-						PercentReady:  0.0,
-						UrlToDownload: "url",
-						FileSize:      0.0,
+						Version:       0.5,
+						PercentReady:  50.0,
+						UrlToDownload: "/static/files/1/pending.zip",
+						ArchiveHash:   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+						FileSize:      2.0,
+						Status:        "pending_scan",
+						GameInfoID:    1,
 					},
 				},
 			},
@@ -98,7 +103,7 @@ func (r *SqliteGameRepo) GetAllCards() ([]GameCard, error) {
 
 func (r *SqliteGameRepo) GetAllGamesInfo() ([]GameInfo, error) {
 	var games []GameInfo
-	result := r.db.Preload("TranslateCards").Find(&games)
+	result := r.db.Preload("TranslateCards", "status = ?", "approved").Find(&games)
 	return games, result.Error
 }
 
@@ -109,6 +114,12 @@ func (r *SqliteGameRepo) GetTranslationByID(id int) (TranslateCard, error) {
 		return TranslateCard{}, err
 	}
 	return card, nil
+}
+
+func (r *SqliteGameRepo) GetTranslationsByAuthorID(authorID int) ([]TranslateCard, error) {
+	var cards []TranslateCard
+	err := r.db.Where("author_id = ?", authorID).Order("created_at desc").Find(&cards).Error
+	return cards, err
 }
 
 func (r *SqliteGameRepo) CreateNewGame(newGameCard GameCard, newGameInfo GameInfo) error {
@@ -163,10 +174,22 @@ func (r *SqliteGameRepo) AddTranslation(gameId int, newTranslateCard TranslateCa
 	return nil
 }
 
+func (r *SqliteGameRepo) ArchiveHashExists(hash string) (bool, error) {
+	if hash == "" {
+		return false, nil
+	}
+
+	var count int64
+	if err := r.db.Model(&TranslateCard{}).Where("archive_hash = ?", hash).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *SqliteGameRepo) GetGameInfoById(gameId int) (GameInfo, error) {
 	var gameInfo GameInfo
 
-	err := r.db.Preload("TranslateCards").First(&gameInfo, gameId).Error
+	err := r.db.Preload("TranslateCards", "status = ?", "approved").First(&gameInfo, gameId).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -314,6 +337,18 @@ func (r *InMemoryGameRepo) GetTranslationByID(id int) (TranslateCard, error) {
 	return TranslateCard{}, errors.New("перевод не найден")
 }
 
+func (r *InMemoryGameRepo) GetTranslationsByAuthorID(authorID int) ([]TranslateCard, error) {
+	var cards []TranslateCard
+	for _, game := range r.gameInfo {
+		for _, card := range game.TranslateCards {
+			if card.AuthorId == authorID {
+				cards = append(cards, card)
+			}
+		}
+	}
+	return cards, nil
+}
+
 func (r *InMemoryGameRepo) CreateNewGame(newGameCard GameCard, newGameInfo GameInfo) error {
 	r.gameInfo = append(r.gameInfo, newGameInfo)
 	r.gameCard = append(r.gameCard, newGameCard)
@@ -357,6 +392,7 @@ func (r *InMemoryGameRepo) GetGameInfoById(gameId int) (GameInfo, error) {
 }
 
 func (r *InMemoryGameRepo) AddTranslation(gameId int, newTranslateCard TranslateCard) error {
+	newTranslateCard.GameInfoID = gameId
 	status := false
 	for i := range r.gameInfo {
 		if r.gameInfo[i].ID == int(gameId) {
@@ -371,6 +407,21 @@ func (r *InMemoryGameRepo) AddTranslation(gameId int, newTranslateCard Translate
 	}
 
 	return nil
+}
+
+func (r *InMemoryGameRepo) ArchiveHashExists(hash string) (bool, error) {
+	if hash == "" {
+		return false, nil
+	}
+
+	for _, game := range r.gameInfo {
+		for _, card := range game.TranslateCards {
+			if card.ArchiveHash == hash {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (r *InMemoryGameRepo) DeleteGame(gameId int) error {
